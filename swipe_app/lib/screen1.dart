@@ -16,6 +16,8 @@ class _Screen1State extends State<Screen1> {
     final text = _controller.text;
     widget.onSend(text);
     _controller.clear();
+    // Hide keyboard after sending
+    FocusScope.of(context).unfocus();
   }
 
   @override
@@ -35,6 +37,8 @@ class _Screen1State extends State<Screen1> {
           const SizedBox(height: 20),
           TextField(
             controller: _controller,
+            autofocus: true, // Automatically focus and show keyboard when screen appears
+            keyboardType: TextInputType.text,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               labelText: 'Enter text',
