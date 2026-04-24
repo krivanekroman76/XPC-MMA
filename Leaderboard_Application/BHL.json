@@ -1,0 +1,91 @@
+{
+    "race_name": "Pasohlávky",
+    "league_name": "(BHL) Břeclavská Hasičská Liga",
+    "sport_preset": "pozarni_utok",
+    "use_splits": false,
+    "lanes": 2,
+    "attempts": 2,
+    "auto_confirm": 60,
+    "teams": [
+        {
+            "id": 1,
+            "name": "Cvrčovice",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 6,
+            "name": "Velké Pavlovice",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 2,
+            "name": "Pasohlávky",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 7,
+            "name": "Dubňany",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 3,
+            "name": "Pasohlávky",
+            "category": "Ženy",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 9,
+            "name": "Velké Pavlovice",
+            "category": "Ženy",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 10,
+            "name": "Kobylí",
+            "category": "Ženy",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 8,
+            "name": "Dubňany",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 4,
+            "name": "Cvrčovice",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        },
+        {
+            "id": 5,
+            "name": "Pasohlávky",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [],
+            "best_time": 0
+        }
+    ]
+}

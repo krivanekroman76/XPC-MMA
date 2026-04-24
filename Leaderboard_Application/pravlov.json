@@ -1,0 +1,202 @@
+{
+    "race_name": "Pravlov",
+    "lanes": 2,
+    "attempts": 2,
+    "auto_confirm": 60,
+    "teams": [
+        {
+            "start_no": 1,
+            "name": "Cvrčovice",
+            "category": "Muži",
+            "status": "done",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 21735,
+                        "2": 16867
+                    },
+                    "final_time": 21735
+                },
+                {
+                    "lanes": {
+                        "1": 18020,
+                        "2": 14125
+                    },
+                    "final_time": 18020,
+                    "pending_confirm": false
+                }
+            ],
+            "best_time": 18020
+        },
+        {
+            "start_no": 2,
+            "name": "Pasohlávky",
+            "category": "Muži",
+            "status": "done",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 15769,
+                        "2": 21022
+                    },
+                    "final_time": 21022
+                },
+                {
+                    "lanes": {
+                        "1": 15228,
+                        "2": 21848
+                    },
+                    "final_time": 999999,
+                    "pending_confirm": false
+                }
+            ],
+            "best_time": 21022
+        },
+        {
+            "start_no": 3,
+            "name": "Velké Pavlovice",
+            "category": "Ženy",
+            "status": "done",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 20739,
+                        "2": 17181
+                    },
+                    "final_time": 20739
+                },
+                {
+                    "lanes": {
+                        "1": 18393,
+                        "2": 16946
+                    },
+                    "final_time": 18393,
+                    "pending_confirm": false
+                }
+            ],
+            "best_time": 18393
+        },
+        {
+            "start_no": 4,
+            "name": "Pasohlávky",
+            "category": "Ženy",
+            "status": "running",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 19694,
+                        "2": 15780
+                    },
+                    "final_time": 19694
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 19694
+        },
+        {
+            "start_no": 5,
+            "name": "Cvrčovice",
+            "category": "Dorost",
+            "status": "preparing",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 14239,
+                        "2": 20253
+                    },
+                    "final_time": 20253
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 20253
+        },
+        {
+            "start_no": 6,
+            "name": "Velké Pavlovice",
+            "category": "Dorost",
+            "status": "preparing",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 16480,
+                        "2": 20561
+                    },
+                    "final_time": 20561
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 20561
+        },
+        {
+            "start_no": 7,
+            "name": "Pasohlávky",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 20319,
+                        "2": 18870
+                    },
+                    "final_time": 20319
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 20319
+        },
+        {
+            "start_no": 8,
+            "name": "Velké Pavlovice",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 14412,
+                        "2": 16746
+                    },
+                    "final_time": 16746,
+                    "pending_confirm": false
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 16746
+        },
+        {
+            "start_no": 9,
+            "name": "Redbull",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {
+                        "1": 18380,
+                        "2": 21823
+                    },
+                    "final_time": 21823,
+                    "pending_confirm": false
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 21823
+        }
+    ]
+}

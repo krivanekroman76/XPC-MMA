@@ -1,0 +1,42 @@
+[
+    {
+        "name": "SDH Cvrčovice",
+        "category": "Dorost"
+    },
+    {
+        "name": "SDH Pasohlávky",
+        "category": "Dorost"
+    },
+    {
+        "name": "SDH Velké Pavlovice",
+        "category": "Dorost"
+    },
+    {
+        "name": "SDH Dubňany",
+        "category": "Dorost"
+    },
+    {
+        "name": "SDH Pasohlávky",
+        "category": "Ženy"
+    },
+    {
+        "name": "SDH Velké Pavlovice",
+        "category": "Ženy"
+    },
+    {
+        "name": "SDH Pasohlávky",
+        "category": "Muži"
+    },
+    {
+        "name": "SDH Cvrčovice",
+        "category": "Muži"
+    },
+    {
+        "name": "SDH Velké Pavlovice",
+        "category": "Muži"
+    },
+    {
+        "name": "SDH Dubňany",
+        "category": "Muži"
+    }
+]

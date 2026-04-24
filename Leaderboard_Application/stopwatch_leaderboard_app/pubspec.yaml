@@ -1,0 +1,28 @@
+name: stopwatch_leaderboard_app
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  fluttertoast: ^9.0.0
+  firebase_core:
+  firebase_database:
+  firebase_messaging: ^16.1.2  # pro push notifikace
+  shared_preferences: ^2.2.2    # pro ukládání stavu přepínačů (on/off)
+  provider:
+  flutter_local_notifications: ^21.0.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

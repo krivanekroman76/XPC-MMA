@@ -1,0 +1,52 @@
+[
+    {
+        "start_no": 1,
+        "team": "Pasohlávky",
+        "category": "Dorost"
+    },
+    {
+        "start_no": 2,
+        "team": "Cvrčovice",
+        "category": "Dorost"
+    },
+    {
+        "start_no": 3,
+        "team": "Dubňany",
+        "category": "Dorost"
+    },
+    {
+        "start_no": 4,
+        "team": "Velké Pavlovice",
+        "category": "Dorost"
+    },
+    {
+        "start_no": 1,
+        "team": "Pasohlávky",
+        "category": "Ženy"
+    },
+    {
+        "start_no": 2,
+        "team": "Velké Pavlovice",
+        "category": "Ženy"
+    },
+    {
+        "start_no": 1,
+        "team": "Pasohlávky",
+        "category": "Muži"
+    },
+    {
+        "start_no": 2,
+        "team": "Cvrčovice",
+        "category": "Muži"
+    },
+    {
+        "start_no": 3,
+        "team": "Velké Pavlovice",
+        "category": "Muži"
+    },
+    {
+        "start_no": 4,
+        "team": "Dubňany",
+        "category": "Muži"
+    }
+]

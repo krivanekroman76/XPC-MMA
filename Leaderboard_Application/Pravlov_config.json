@@ -1,0 +1,160 @@
+{
+    "race_name": "Pravlov",
+    "lanes": 2,
+    "attempts": 2,
+    "teams": [
+        {
+            "id": 1,
+            "name": "Cvrčovice",
+            "category": "Muži",
+            "status": "running",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 2,
+            "name": "Pasohlávky",
+            "category": "Muži",
+            "status": "preparing",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 3,
+            "name": "Velké Pavlovice",
+            "category": "Ženy",
+            "status": "preparing",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 4,
+            "name": "Pasohlávky",
+            "category": "Ženy",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 5,
+            "name": "Cvrčovice",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 6,
+            "name": "Velké Pavlovice",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 7,
+            "name": "Pasohlávky",
+            "category": "Dorost",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 8,
+            "name": "Velké Pavlovice",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        },
+        {
+            "id": 9,
+            "name": "Redbull",
+            "category": "Muži",
+            "status": "idle",
+            "attempts_data": [
+                {
+                    "lanes": {},
+                    "final_time": 0
+                },
+                {
+                    "lanes": {},
+                    "final_time": 0
+                }
+            ],
+            "best_time": 0
+        }
+    ]
+}
