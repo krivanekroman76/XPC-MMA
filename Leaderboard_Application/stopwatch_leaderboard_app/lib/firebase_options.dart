@@ -88,4 +88,5 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://mma-project-91699-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'mma-project-91699.firebasestorage.app',
   );
+
 }

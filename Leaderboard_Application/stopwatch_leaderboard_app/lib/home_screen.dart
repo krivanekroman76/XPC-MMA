@@ -5,41 +5,54 @@ import 'team_model.dart';
 import 'welcome_screen.dart';
 import 'dart:async';
 import 'theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'settings_screen.dart';
 
 enum SortType { rank, startNo }
 
 class RaceLeaderboard extends StatefulWidget {
+  final String initialLeague;
   final String initialRace;
-  const RaceLeaderboard({super.key, required this.initialRace});
+
+  const RaceLeaderboard({
+    super.key,
+    required this.initialLeague,
+    required this.initialRace,
+  });
 
   @override
   State<RaceLeaderboard> createState() => _RaceLeaderboardState();
 }
 
 class _RaceLeaderboardState extends State<RaceLeaderboard> {
+  late String selectedLeague;
   late String selectedRace;
   String selectedCategory = "Vše";
   SortType currentSort = SortType.rank;
 
+  Map<String, double> previousBestTimes = {};
+
   @override
   void initState() {
     super.initState();
+    selectedLeague = widget.initialLeague;
     selectedRace = widget.initialRace;
   }
 
-  // Funkce na překlad filtrů kategorií (Firebase potřebuje český klíč, my měníme jen co vidí uživatel)
   String getTranslatedCategory(String cat, ThemeProvider tp) {
-    if (cat == "Vše") return tp.translate("Vše", "All");
-    if (cat == "Muži") return tp.translate("Muži", "Men");
-    if (cat == "Ženy") return tp.translate("Ženy", "Women");
-    if (cat == "Dorost") return tp.translate("Dorost", "Youth");
+    if (cat == "Vše") return tp.translateKey("all");
+    if (cat == "Muži") return tp.translateKey("men");
+    if (cat == "Ženy") return tp.translateKey("women");
+    if (cat == "Dorost") return tp.translateKey("youth");
     return cat;
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isSubscribed = FirebaseService().isRaceNotificationEnabled(selectedRace);
+    String uniqueRaceId = "${selectedLeague}_$selectedRace";
+    bool isSubscribed = FirebaseService().isRaceNotificationEnabled(uniqueRaceId);
     bool isMasterOn = FirebaseService().isMasterNotificationEnabled;
+
     final themeProvider = Provider.of<ThemeProvider>(context);
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -48,58 +61,61 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
         final bool isLandscape = orientation == Orientation.landscape;
 
         return Scaffold(
-          // ODSTRANĚNA TVRDÁ ČERNÁ, POUŽIJE SE BARVA TÉMATU
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('active_race');
+                if (mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                  );
+                }
+              },
+            ),
             title: Text(selectedRace, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             elevation: 0,
             actions: [
-              // Výběr barvy
-              PopupMenuButton<Color>(
-                icon: const Icon(Icons.palette),
-                onSelected: (color) => themeProvider.setColor(color),
-                itemBuilder: (context) => themeProvider.availableColors.map((color) => PopupMenuItem(
-                  value: color,
-                  child: Container(width: 24, height: 24, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                )).toList(),
-              ),
-              TextButton(
-                onPressed: () => themeProvider.toggleLanguage(),
-                child: Text(
-                  themeProvider.locale.languageCode.toUpperCase(),
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: themeProvider.isDarkMode ? Colors.white : colorScheme.primary),
-                ),
-              ),
               IconButton(
-                icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-                onPressed: () => themeProvider.toggleTheme(),
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  );
+                },
               ),
               StreamBuilder<RaceSettings>(
-                  stream: FirebaseService().getSettingsStream(selectedRace),
+                  stream: FirebaseService().getSettingsStream(selectedLeague, selectedRace),
                   builder: (context, snapshot) {
-                    bool isFinished = snapshot.data?.isFinished ?? false;
-                    if (isFinished) return const SizedBox();
-
-                    if (isMasterOn) {
-                      return IconButton(
-                        icon: Icon(Icons.notifications_active, color: colorScheme.primary),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(themeProvider.translate('Už odebíráte všechny závody.', 'You are already subscribed to all.'))));
-                        },
-                      );
-                    }
+                    // Use the logic from your FirebaseService/Prefs
+                    bool isGlobalOn = FirebaseService().isMasterOn;
+                    bool isSubscribed = FirebaseService().isRaceNotificationEnabled(selectedRace);
 
                     return IconButton(
                       icon: Icon(
-                        isSubscribed ? Icons.notifications_active : Icons.notifications_none,
-                        color: isSubscribed ? colorScheme.primary : (themeProvider.isDarkMode ? Colors.white70 : Colors.black54),
+                        (isGlobalOn || isSubscribed) ? Icons.notifications_active : Icons.notifications_none,
+                        color: (isGlobalOn || isSubscribed) ? colorScheme.primary : Colors.grey,
                       ),
-                      onPressed: () async {
-                        if (!isSubscribed) {
-                          bool success = await FirebaseService().init();
-                          if (!success) return;
-                        }
-                        await FirebaseService().setRaceNotification(selectedRace, !isSubscribed);
-                        setState(() {});
+                      onPressed: isGlobalOn
+                          ? () {
+                        _showToast(context, themeProvider.translateKey('global_is_active'), colorScheme.secondary, Icons.info);
+                      }
+                          : () async {
+                        // Call the specific toggle method you defined
+                        // Ensure this method is accessible (Static or via instance)
+                        await FirebaseService().setRaceNotification(selectedLeague, selectedRace, !isSubscribed);
+
+                        setState(() {}); // Refresh the bell icon color
+
+                        _showToast(
+                            context,
+                            !isSubscribed ? "Notifications On" : "Notifications Off",
+                            !isSubscribed ? Colors.green : Colors.grey,
+                            !isSubscribed ? Icons.notifications_active : Icons.notifications_off
+                        );
                       },
                     );
                   }
@@ -112,7 +128,7 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
           ),
           drawer: _buildDrawer(themeProvider, colorScheme),
           body: StreamBuilder<RaceSettings>(
-              stream: FirebaseService().getSettingsStream(selectedRace),
+              stream: FirebaseService().getSettingsStream(selectedLeague, selectedRace),
               builder: (context, settingsSnapshot) {
                 final settings = settingsSnapshot.data ?? RaceSettings.defaultSettings();
                 return Column(
@@ -138,12 +154,12 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
           DrawerHeader(
             decoration: BoxDecoration(color: colorScheme.primary),
             child: Center(
-              child: Text(tp.translate('XPC-MMA\nZávody', 'XPC-MMA\nRaces'), style: const TextStyle(color: Colors.white, fontSize: 24), textAlign: TextAlign.center),
+              child: Text(tp.translateKey('xpc_races'), style: const TextStyle(color: Colors.white, fontSize: 24), textAlign: TextAlign.center),
             ),
           ),
           ListTile(
             leading: const Icon(Icons.home),
-            title: Text(tp.translate('Hlavní menu', 'Main Menu')),
+            title: Text(tp.translateKey('main_menu')),
             onTap: () {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const WelcomeScreen()),
@@ -154,9 +170,9 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
           const Divider(),
           Expanded(
             child: StreamBuilder<List<String>>(
-              stream: FirebaseService().getRacesStream(),
+              stream: FirebaseService().getRacesStream(selectedLeague),
               builder: (context, snapshot) {
-                final races = snapshot.data ?? FirebaseService().currentRaces;
+                final races = snapshot.data ?? [];
                 return ListView.builder(
                   itemCount: races.length,
                   itemBuilder: (context, index) {
@@ -214,14 +230,14 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
       color: bgColor,
       child: Row(
         children: [
-          SizedBox(width: 40, child: Text(tp.translate('ST', 'ST'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10))),
+          SizedBox(width: 40, child: Text(tp.translateKey('st'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10))),
           SizedBox(width: 25, child: Text('#', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10))),
           if (isLandscape) ...[
             SizedBox(width: 30, child: Text('Pos', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center)),
             SizedBox(width: 30, child: Text('Cat', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center)),
           ],
-          Expanded(child: Text(tp.translate('TÝM', 'TEAM'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10))),
-          SizedBox(width: 75, child: Text(tp.translate('VÝSLEDEK', 'RESULT'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center)),
+          Expanded(child: Text(tp.translateKey('team'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10))),
+          SizedBox(width: 75, child: Text(tp.translateKey('result'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center)),
           if (isLandscape) ..._buildHeaderLanes(settings, textColor),
         ],
       ),
@@ -231,25 +247,68 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
   List<Widget> _buildHeaderLanes(RaceSettings settings, Color textColor) {
     List<Widget> widgets = [];
     for (int i = 0; i < settings.attemptsCount; i++) {
-      for (int j = 0; j < settings.lanesCount; j++) {
-        String label = settings.attemptsCount > 1 ? '${i+1}L${j+1}' : 'L${j+1}';
-        widgets.add(SizedBox(width: 42, child: Text(label, style: TextStyle(color: textColor, fontSize: 8), textAlign: TextAlign.center)));
+      if (settings.sectionsCount == 2) {
+        widgets.add(SizedBox(width: 42, child: Text('L${i + 1}', style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center)));
+        widgets.add(SizedBox(width: 42, child: Text('R${i + 1}', style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center)));
+      } else {
+        for (int j = 0; j < settings.lanesCount; j++) {
+          widgets.add(SizedBox(width: 42, child: Text('L${j + 1}', style: TextStyle(color: textColor, fontSize: 8), textAlign: TextAlign.center)));
+        }
       }
-      String resLabel = 'A${i+1}';
-      widgets.add(SizedBox(width: 45, child: Text(resLabel, style: TextStyle(color: textColor, fontSize: 8), textAlign: TextAlign.center)));
+      widgets.add(SizedBox(width: 45, child: Text('B${i + 1}', style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center)));
+    }
+    return widgets;
+  }
+
+  List<Widget> _buildRowLanes(Team team, RaceSettings settings, Color textColor) {
+    List<Widget> widgets = [];
+    for (int i = 0; i < settings.attemptsCount; i++) {
+      if (settings.sectionsCount == 2) {
+        widgets.add(SizedBox(width: 42, child: Text(team.getTimeLeft(i), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center)));
+        widgets.add(SizedBox(width: 42, child: Text(team.getTimeRight(i), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center)));
+      } else {
+        for (int j = 0; j < settings.lanesCount; j++) {
+          widgets.add(SizedBox(width: 42, child: Text(team.getRunLaneTime(i, j), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center)));
+        }
+      }
+      widgets.add(SizedBox(width: 45, child: Text(team.getRunFinalTime(i), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.center)));
     }
     return widgets;
   }
 
   Widget _buildTeamList(bool isLandscape, RaceSettings settings, ThemeProvider tp) {
     return StreamBuilder<List<Team>>(
-      key: ValueKey('$selectedRace-$selectedCategory'),
-      stream: selectedCategory == "Vše"
-          ? _getMergedStream(selectedRace)
-          : FirebaseService().getTeamsStream(selectedRace, selectedCategory),
+      key: ValueKey('$selectedLeague-$selectedRace-$selectedCategory'),
+      stream: FirebaseService().getTeamsStream(selectedLeague, selectedRace, selectedCategory),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var teams = snapshot.data!;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+
+          for (var team in teams) {
+            if (!previousBestTimes.containsKey(team.id)) {
+              previousBestTimes[team.id] = team.bestTime;
+              continue;
+            }
+
+            double oldTime = previousBestTimes[team.id]!;
+            double newTime = team.bestTime;
+
+            if (oldTime != newTime && newTime > 0) {
+              if (newTime == 999999.0 && oldTime != 999999.0) {
+                _showToast(context, "${team.name}: ${tp.translateKey('invalid_attempt')}", Colors.red, Icons.cancel);
+              } else if (newTime < oldTime || oldTime >= 999999.0) {
+                _showToast(context, "${team.name}: ${tp.translateKey('time_improved')} (${newTime.toStringAsFixed(3)})", Colors.green, Icons.trending_up);
+              } else if (newTime > oldTime && oldTime > 0) {
+                _showToast(context, "${team.name}: ${tp.translateKey('time_worse')}", Colors.orange, Icons.trending_down);
+              }
+              previousBestTimes[team.id] = newTime;
+            }
+          }
+        });
+
         final fullSortedList = List<Team>.from(teams);
         fullSortedList.sort((a, b) {
           bool aHasTime = a.bestTime > 0 && a.bestTime < 999999;
@@ -263,7 +322,7 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
         final Map<String, Map<String, int>> ranks = {};
         for (var cat in ["Muži", "Ženy", "Dorost"]) {
           var catTeams = fullSortedList.where((t) => t.category == cat).toList();
-          ranks[cat] = { for (var i = 0; i < catTeams.length; i++) catTeams[i].id : i + 1 };
+          ranks[cat] = { for (var i = 0; i < catTeams.length; i++) catTeams[i].id: i + 1};
         }
 
         if (currentSort == SortType.startNo) {
@@ -277,10 +336,10 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
           itemBuilder: (context, index) {
             final team = teams[index];
             int winnerRank = -1;
-            if (settings.isFinished) {
-              var winners = fullSortedList.where((t) => t.category == team.category && t.bestTime > 0 && t.bestTime < 999999).take(3).map((t) => t.id).toList();
-              winnerRank = winners.indexOf(team.id);
-            }
+            var validTeams = fullSortedList.where((t) => t.category == team.category && t.bestTime > 0 && t.bestTime < 999999).toList();
+            var winners = validTeams.take(3).map((t) => t.id).toList();
+            winnerRank = winners.indexOf(team.id);
+
             return _buildTeamRow(team, winnerRank, ranks[team.category]?[team.id] ?? 0, isLandscape, settings, tp);
           },
         );
@@ -288,41 +347,23 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
     );
   }
 
-  Stream<List<Team>> _getMergedStream(String race) {
-    final controller = StreamController<List<Team>>();
-    Map<String, List<Team>> latestData = {};
-    void update() {
-      if (controller.isClosed) return;
-      List<Team> all = [];
-      latestData.values.forEach((list) => all.addAll(list));
-      controller.add(all);
-    }
-    final subs = <StreamSubscription>[];
-    for (var cat in ["Muži", "Ženy", "Dorost"]) {
-      subs.add(FirebaseService().getTeamsStream(race, cat).listen((data) {
-        latestData[cat] = data;
-        update();
-      }));
-    }
-    controller.onCancel = () { for (var s in subs) { s.cancel(); } };
-    return controller.stream;
-  }
-
   Widget _buildTeamRow(Team team, int winnerRank, int currentRank, bool isLandscape, RaceSettings settings, ThemeProvider tp) {
     Color catColor = team.category == "Muži" ? Colors.blue : team.category == "Ženy" ? Colors.red : Colors.purple;
     Color statusColor = Colors.grey;
     String statusText = "IDLE";
 
-    if (team.status == "running") {
+    final safeStatus = team.status.toLowerCase();
+
+    if (safeStatus == "running") {
       statusColor = Colors.orangeAccent;
       statusText = "RUN";
-    } else if (team.status == "preparing") {
+    } else if (safeStatus == "preparing") {
       statusColor = Colors.lightBlueAccent;
       statusText = "PREP";
-    } else if (team.status == "waiting") {
+    } else if (safeStatus == "waiting") {
       statusColor = Colors.amber;
       statusText = "WAIT";
-    } else if (team.status == "done" || team.bestTime > 0) {
+    } else if (safeStatus == "done" || team.bestTime > 0) {
       statusColor = Colors.greenAccent;
       statusText = "DONE";
     }
@@ -359,14 +400,22 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
     );
   }
 
-  List<Widget> _buildRowLanes(Team team, RaceSettings settings, Color textColor) {
-    List<Widget> widgets = [];
-    for (int i = 0; i < settings.attemptsCount; i++) {
-      for (int j = 0; j < settings.lanesCount; j++) {
-        widgets.add(SizedBox(width: 42, child: Text(team.getRunLaneTime(i, j), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center)));
-      }
-      widgets.add(SizedBox(width: 45, child: Text(team.getRunFinalTime(i), style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 11), textAlign: TextAlign.center)));
-    }
-    return widgets;
+  void _showToast(BuildContext context, String message, Color color, IconData icon) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+        backgroundColor: color,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 20.0, left: 20.0, right: 20.0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 }

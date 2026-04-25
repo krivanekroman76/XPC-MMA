@@ -1,28 +1,36 @@
-import 'package:flutter/foundation.dart';
-
 class RaceSettings {
   final int attemptsCount;
   final int lanesCount;
+  final int sectionsCount; // ADDED: To determine if we need L and R columns
+  final String logic;      // ADDED: e.g., "attack" vs "standard"
   final bool isFinished;
 
   RaceSettings({
     required this.attemptsCount,
     required this.lanesCount,
+    required this.sectionsCount,
+    required this.logic,
     required this.isFinished,
   });
 
-  factory RaceSettings.fromJson(Map<String, dynamic> json) {
+  factory RaceSettings.fromMap(Map<String, dynamic>? data) {
+    if (data == null) return RaceSettings.defaultSettings();
     return RaceSettings(
-      // Využíváme operátor ?? pro případ, že hodnota v databázi ještě není
-      lanesCount: json['lanes_count'] ?? json['lanesCount'] ?? 2,
-      attemptsCount: json['attempts_count'] ?? json['attemptsCount'] ?? 1,
-      isFinished: json['is_finished'] ?? json['isFinished'] ?? false,
+      attemptsCount: data['attempts'] ?? 2,
+      lanesCount: data['lanes'] ?? 1,
+      sectionsCount: data['sections'] ?? 1, // Default to 1 if missing
+      logic: data['logic'] ?? 'standard',
+      isFinished: false, // Update this if you have a finished flag in your DB
     );
   }
 
-  factory RaceSettings.defaultSettings() {
-    return RaceSettings(attemptsCount: 1, lanesCount: 2, isFinished: false);
-  }
+  static RaceSettings defaultSettings() => RaceSettings(
+    attemptsCount: 2,
+    lanesCount: 1,
+    sectionsCount: 1,
+    logic: 'standard',
+    isFinished: false,
+  );
 }
 
 class Team {
@@ -30,143 +38,95 @@ class Team {
   final String name;
   final String category;
   final int startNo;
-  final int bestTime;
   final String status;
-  final List<dynamic> attempts;
+  final double bestTime;
+  final List<dynamic> attempts; // Array from Firestore
 
   Team({
     required this.id,
     required this.name,
     required this.category,
     required this.startNo,
-    required this.bestTime,
     required this.status,
+    required this.bestTime,
     required this.attempts,
   });
 
-  static int parseInt(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is double) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
-    return 0;
-  }
-
-  static int parseTime(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is double) return value < 1000 ? (value * 1000).toInt() : value.toInt();
-    if (value is String) {
-      double? d = double.tryParse(value);
-      if (d != null) return d < 1000 ? (d * 1000).toInt() : d.toInt();
-    }
-    return 0;
-  }
-
-  factory Team.fromFirebase(String id, Map<dynamic, dynamic> data, {String? fallbackCategory}) {
-    int extractedBestTime = parseTime(data['best_time'] ?? data['bestTime'] ?? data['time']);
-    
-    List<dynamic> attempts = [];
-    final rawAttempts = data['attempts'];
-    if (rawAttempts is List) {
-      attempts = rawAttempts;
-    } else if (rawAttempts is Map) {
-      var sortedKeys = rawAttempts.keys.toList()
-        ..sort((a, b) {
-          int? ia = int.tryParse(a.toString());
-          int? ib = int.tryParse(b.toString());
-          if (ia != null && ib != null) return ia.compareTo(ib);
-          return a.toString().compareTo(b.toString());
-        });
-      attempts = sortedKeys.map((k) => rawAttempts[k]).toList();
-    }
-
-    if (extractedBestTime == 0 && attempts.isNotEmpty) {
-      for (var attempt in attempts) {
-        if (attempt is Map) {
-          int ft = parseTime(attempt['final_time'] ?? attempt['finalTime']);
-          if (ft > 0 && ft < 999999 && (extractedBestTime == 0 || ft < extractedBestTime)) {
-            extractedBestTime = ft;
-          }
-        }
-      }
+  factory Team.fromFirestore(String key, Map<String, dynamic> data) {
+    // Parse best_time safely (it might not exist or might be an int/double)
+    double parsedBestTime = 999999.0;
+    if (data['best_time'] != null) {
+      parsedBestTime = (data['best_time'] is num)
+          ? (data['best_time'] as num).toDouble()
+          : double.tryParse(data['best_time'].toString()) ?? 999999.0;
     }
 
     return Team(
-      id: id,
-      name: (data['name'] ?? data['team_name'] ?? id).toString(),
-      category: (data['category'] ?? data['cat'] ?? fallbackCategory ?? 'Nezadáno').toString(),
-      startNo: parseInt(data['start_no'] ?? data['startNo'] ?? data['st_no']),
-      bestTime: extractedBestTime,
-      status: (data['status'] ?? 'preparing').toString(),
-      attempts: attempts,
+      id: key, // The "0", "1", "2" key from start_list
+      name: data['team'] ?? 'Neznámý',
+      category: data['category'] ?? 'Muži',
+      startNo: data['start_no'] ?? 0,
+      status: data['state'] ?? 'IDLE',
+      bestTime: parsedBestTime,
+      attempts: data['attempts'] as List<dynamic>? ?? [],
     );
   }
 
-  String get formattedTime => formatMs(bestTime);
-
-  static String formatMs(int ms) {
-    if (ms <= 0) return "--:--";
-    if (ms >= 999999) return "NP";
-    return "${(ms / 1000).toStringAsFixed(2)}s";
+  String get formattedTime {
+    if (bestTime >= 999999.0) return "N/A";
+    return bestTime.toStringAsFixed(3);
   }
 
-  String getRunLaneTime(int runIndex, int laneIndex) {
-    if (attempts.length <= runIndex) return "--";
-    final run = attempts[runIndex];
-    if (run is Map) {
-      if (run['lanes'] != null) {
-        final lanesData = run['lanes'];
-        dynamic laneValue;
-        
-        // Target is 1-based index for lookup (Lane 1 = key 1)
-        int targetIdx = laneIndex + 1;
+  // --- NEW: Safely extract Left Target Time ---
+  String getTimeLeft(int attemptIdx) {
+    if (attemptIdx >= attempts.length) return "-";
+    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
+    if (attemptData == null) return "-";
 
-        if (lanesData is List) {
-          // Check if list actually has a value at the target index
-          if (targetIdx < lanesData.length && lanesData[targetIdx] != null && lanesData[targetIdx] != 0) {
-            laneValue = lanesData[targetIdx];
-          } 
-          // Only fallback to index 0 if targetIdx 1 failed and index 0 is valid
-          else if (laneIndex == 0 && lanesData.isNotEmpty && lanesData[0] != null && lanesData[0] != 0) {
-            laneValue = lanesData[0];
-          }
-        } else if (lanesData is Map) {
-          // Strict 1-based lookup first
-          laneValue = lanesData[targetIdx.toString()] ?? lanesData[targetIdx];
-          
-          // Fallback to 0-based only if 1st lane and no 1st lane found
-          if (laneValue == null && laneIndex == 0) {
-            laneValue = lanesData["0"] ?? lanesData[0];
-          }
-        }
-        
-        if (laneValue != null) {
-          int timeMs = parseTime(laneValue);
-          if (timeMs > 0) return timeMs >= 999999 ? "NP" : (timeMs / 1000).toStringAsFixed(2);
-        }
-      }
-      
-      // Secondary fallback for flat attempt structure
-      final possibleKeys = ["lane_${laneIndex + 1}", "lane${laneIndex + 1}", "l${laneIndex + 1}"];
-      for (var key in possibleKeys) {
-        if (run[key] != null) {
-          int timeMs = parseTime(run[key]);
-          if (timeMs > 0) return timeMs >= 999999 ? "NP" : (timeMs / 1000).toStringAsFixed(2);
-        }
-      }
-    }
-    return "--";
+    var val = attemptData['time_left'];
+    if (val is num) return val.toStringAsFixed(3);
+    return val?.toString() ?? "-"; // Returns "--.---" if it's a string
   }
 
-  String getRunFinalTime(int runIndex) {
-    if (attempts.length <= runIndex) return "--:--";
-    final run = attempts[runIndex];
-    if (run is Map) {
-      final finalTime = run['final_time'] ?? run['finalTime'];
-      int ft = parseTime(finalTime);
-      return formatMs(ft);
+  // --- NEW: Safely extract Right Target Time ---
+  String getTimeRight(int attemptIdx) {
+    if (attemptIdx >= attempts.length) return "-";
+    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
+    if (attemptData == null) return "-";
+
+    var val = attemptData['time_right'];
+    if (val is num) return val.toStringAsFixed(3);
+    return val?.toString() ?? "-"; // Returns "--.---" if it's a string
+  }
+
+  // --- UPDATED: Safely extract Final Time (handles both string and num) ---
+  String getRunFinalTime(int attemptIdx) {
+    if (attemptIdx >= attempts.length) return "-";
+    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
+    if (attemptData == null) return "-";
+
+    // If NP return NP not 99999 time
+    if (attemptData['state'] == 'NP') {
+      return "NP";
     }
-    return "--:--";
+
+    var val = attemptData['final_time'];
+    if (val == 999999 || val == 999999.0) return "NP";
+
+    if (val is num) return val.toStringAsFixed(3);
+    return val?.toString() ?? "-";
+  }
+
+  // Safely extract lane times for standard athletic tracks (Fallback)
+  String getRunLaneTime(int attemptIdx, int laneIdx) {
+    if (attemptIdx >= attempts.length) return "-";
+    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
+    if (attemptData == null) return "-";
+
+    // Fallback logic if needed for other sports
+    String key = laneIdx == 0 ? 'time_left' : 'time_right';
+    var val = attemptData[key];
+    if (val is num) return val.toStringAsFixed(3);
+    return val?.toString() ?? "-";
   }
 }

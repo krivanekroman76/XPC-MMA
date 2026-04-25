@@ -1,6 +1,8 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, 
-                               QLineEdit, QPushButton, QComboBox, QFormLayout, 
-                               QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView)
+import os
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
+                               QFileDialog, QLineEdit, QPushButton, QComboBox, 
+                               QFormLayout, QMessageBox, QTableWidget, 
+                               QTableWidgetItem, QHeaderView, QDialog)
 from PySide6.QtCore import Qt
 
 # Import the translator
@@ -18,23 +20,35 @@ class AdminToolsPage(QWidget):
         self.retranslate_ui() 
 
     def setup_ui(self):
+        # Main layout for the whole page (Top to Bottom)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(30, 30, 30, 30)
         self.layout.setSpacing(20)
 
-        # Title (Styles inherited from QLabel#title in QSS)
+        # 1. Main Title
         self.title_label = QLabel()
-        self.title_label.setObjectName("title")
+        self.title_label.setObjectName("title") # Dashboard title style
         self.layout.addWidget(self.title_label)
+        
+        # 2. Upload Translation Button (Green)
+        self.upload_trans_btn = QPushButton()
+        self.upload_trans_btn.setObjectName("successButton") # Uses your QSS green
+        self.upload_trans_btn.setFixedWidth(250)
+        self.upload_trans_btn.clicked.connect(self.handle_upload_translation)
+        # Add to layout aligned to the left
+        self.layout.addWidget(self.upload_trans_btn, alignment=Qt.AlignLeft)
+
+        # 3. User & League Creation Form
+        self.user_group = QGroupBox()
+        user_group_layout = QVBoxLayout(self.user_group)
+        user_group_layout.setSpacing(15)
 
         form_layout = QFormLayout()
         
-        # Inputs (Styles inherited from global QLineEdit in QSS)
         self.email_input = QLineEdit()
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.Password)
 
-        # Combos (Styles inherited from global QComboBox in QSS)
         self.role_combo = QComboBox()
         self.role_combo.addItems(["admin", "writer"])
 
@@ -47,7 +61,7 @@ class AdminToolsPage(QWidget):
         self.new_league_abbr_input = QLineEdit()
         self.new_league_abbr_input.hide()
 
-        # Labels (Instance variables for retranslate_ui)
+        # Labels
         self.email_label = QLabel()
         self.password_label = QLabel()
         self.role_label = QLabel()
@@ -63,24 +77,37 @@ class AdminToolsPage(QWidget):
         form_layout.addRow(self.new_league_name_label, self.new_league_name_input)
         form_layout.addRow(self.new_league_abbr_label, self.new_league_abbr_input)
 
-        self.layout.addLayout(form_layout)
+        user_group_layout.addLayout(form_layout)
 
-        # Create Button
         self.create_btn = QPushButton()
-        self.create_btn.setObjectName("successButton") # Targeted in QSS
+        self.create_btn.setObjectName("successButton") 
+        self.create_btn.setFixedWidth(200)
         self.create_btn.clicked.connect(self.handle_create_user)
-        self.layout.addWidget(self.create_btn)
+        user_group_layout.addWidget(self.create_btn)
 
-        # Users table (Styles inherited from global QTableWidget in QSS)
+        self.layout.addWidget(self.user_group)
+
+        # 4. Users Table
+        self.table_group = QGroupBox()
+        table_layout = QVBoxLayout(self.table_group)
+        
         self.users_table = QTableWidget()
-        self.users_table.setColumnCount(4)
+        self.users_table.setColumnCount(4) # 0: Email, 1: ID, 2: League/Races, 3: Action
         self.users_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.layout.addWidget(self.users_table)
+        self.users_table.setEditTriggers(QTableWidget.NoEditTriggers) # Make cells read-only
+        table_layout.addWidget(self.users_table)
+
+        self.layout.addWidget(self.table_group)
 
     def retranslate_ui(self):
         """Updates all texts in the UI according to the current language."""
         self.title_label.setText(tr.t("admin_title"))
+        self.upload_trans_btn.setText(tr.t("admin_btn_upload_trans"))
         
+        # Group Box Titles
+        self.user_group.setTitle(tr.t("admin_group_create_user"))
+        self.table_group.setTitle(tr.t("admin_group_users_list"))
+
         self.email_input.setPlaceholderText(tr.t("admin_email_placeholder"))
         self.password_input.setPlaceholderText(tr.t("admin_password_placeholder"))
         self.new_league_name_input.setPlaceholderText(tr.t("admin_new_league_name_placeholder"))
@@ -98,31 +125,33 @@ class AdminToolsPage(QWidget):
         # Table headers
         headers = [
             tr.t("admin_col_email"), 
-            tr.t("admin_col_role"), 
+            "ID", # Usually doesn't need translation, but you can add it
             tr.t("admin_col_league"), 
-            tr.t("admin_col_permissions")
+            tr.t("admin_col_action") # The delete column header
         ]
         self.users_table.setHorizontalHeaderLabels(headers)
 
-        # Reload combo to apply translation to the "New League" option
         current_league_data = self.league_combo.currentData()
         self.load_leagues_to_combo()
-        
-        # Try to restore previously selected item
         index = self.league_combo.findData(current_league_data)
         if index != -1:
             self.league_combo.setCurrentIndex(index)
 
     def load_leagues_to_combo(self):
         """Loads leagues from the DB into the combo box."""
+        self.league_combo.blockSignals(True) 
         self.league_combo.clear()
         self.league_combo.addItem(tr.t("admin_combo_new_league"), "NEW")
+        
         leagues = self.db.get_all_leagues()
-        for lg in leagues:
-            self.league_combo.addItem(f"{lg['abbreviation']} - {lg['name']}", lg['id'])
+        if leagues:
+            for lg in leagues:
+                self.league_combo.addItem(f"{lg['abbreviation']} - {lg['name']}", lg['id'])
+                
+        self.league_combo.blockSignals(False) 
+        self.toggle_new_league_fields() 
 
     def toggle_new_league_fields(self):
-        """Shows/hides the new league input fields based on combo selection."""
         if self.league_combo.currentData() == "NEW":
             self.new_league_name_input.show()
             self.new_league_abbr_input.show()
@@ -131,7 +160,6 @@ class AdminToolsPage(QWidget):
             self.new_league_abbr_input.hide()
 
     def handle_create_user(self):
-        """Validates inputs and creates a new user (and league if needed)."""
         email = self.email_input.text().strip()
         password = self.password_input.text().strip()
         role = self.role_combo.currentText()
@@ -141,7 +169,6 @@ class AdminToolsPage(QWidget):
             QMessageBox.warning(self, tr.t("common_msg_error"), tr.t("admin_error_empty_credentials"))
             return
 
-        # If we are creating a new league
         if league_id == "NEW":
             l_name = self.new_league_name_input.text().strip()
             l_abbr = self.new_league_abbr_input.text().strip()
@@ -149,7 +176,6 @@ class AdminToolsPage(QWidget):
                 QMessageBox.warning(self, tr.t("common_msg_error"), tr.t("admin_error_empty_league"))
                 return
                 
-            # Create league in DB and get ID
             league_id = self.db.create_league(l_name, l_abbr)
             if not league_id:
                 QMessageBox.critical(self, tr.t("common_msg_error"), tr.t("admin_error_league_creation_failed"))
@@ -157,7 +183,6 @@ class AdminToolsPage(QWidget):
 
         self.create_btn.setEnabled(False)
         
-        # Ensure your db.create_user_account accepts the league ID
         success, msg = self.db.create_user_account(email, password, role, league_id)
         
         if success:
@@ -166,7 +191,7 @@ class AdminToolsPage(QWidget):
             self.password_input.clear()
             self.new_league_name_input.clear()
             self.new_league_abbr_input.clear()
-            self.load_leagues_to_combo() # Refreshes dropdown with the new league
+            self.load_leagues_to_combo() 
             self.load_users()
         else:
             QMessageBox.critical(self, tr.t("common_msg_error"), msg)
@@ -174,13 +199,81 @@ class AdminToolsPage(QWidget):
         self.create_btn.setEnabled(True)
 
     def load_users(self):
-        """Fetches users from the database and populates the table."""
+        """Fetches users from the database and populates the table with a Delete button."""
         self.users_table.setRowCount(0)
         users_data = self.db.get_all_users()
         for row_idx, user in enumerate(users_data):
             self.users_table.insertRow(row_idx)
+            
+            # Fill user data (make sure the keys match your database return objects)
+            user_id = user.get('id', '-')
             self.users_table.setItem(row_idx, 0, QTableWidgetItem(user.get('email', '-')))
-            self.users_table.setItem(row_idx, 1, QTableWidgetItem(user.get('role', '-')))
-            # In DB the user has assigned_league = league ID. Map ID to abbr in real app if possible.
-            self.users_table.setItem(row_idx, 2, QTableWidgetItem(user.get('assigned_league', '-')))
-            self.users_table.setItem(row_idx, 3, QTableWidgetItem("-"))
+            self.users_table.setItem(row_idx, 1, QTableWidgetItem(str(user_id)))
+            self.users_table.setItem(row_idx, 2, QTableWidgetItem(str(user.get('assigned_league', '-'))))
+            
+            # Create a Delete button for the action column
+            delete_btn = QPushButton("Delete")
+            delete_btn.setCursor(Qt.PointingHandCursor)
+            # Simple inline styling to make it look like a danger button
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #c0392b;
+                }
+            """)
+            
+            # Using a lambda to pass the specific user_id to the delete method
+            delete_btn.clicked.connect(lambda checked=False, uid=user_id: self.handle_delete_user(uid))
+            
+            # Add the button widget to the 4th column (index 3)
+            self.users_table.setCellWidget(row_idx, 3, delete_btn)
+            
+    def handle_delete_user(self, user_id):
+        """Confirms and deletes a user."""
+        if user_id == '-':
+            return
+            
+        reply = QMessageBox.question(
+            self, 
+            tr.t("admin_delete_confirm_title", default="Confirm Delete"), 
+            tr.t("admin_delete_confirm_msg", default=f"Are you sure you want to delete user ID {user_id}?"),
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            # You will need to implement `delete_user` in your firebase_service.py/db script
+            success, msg = self.db.delete_user(user_id) 
+            if success:
+                QMessageBox.information(self, tr.t("common_msg_success"), msg)
+                self.load_users() # Refresh table
+            else:
+                QMessageBox.critical(self, tr.t("common_msg_error"), msg)
+
+    def handle_upload_translation(self):
+        """Opens a file dialog to select a JSON file and uploads it."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Translation File", 
+            "", 
+            "JSON Files (*.json)"
+        )
+
+        if file_path:
+            self.upload_trans_btn.setEnabled(False)
+            
+            # Assuming upload_single_translation returns (bool_success, string_message)
+            success, msg = self.db.upload_single_translation(file_path)
+            
+            if success:
+                QMessageBox.information(self, tr.t("common_msg_success"), msg)
+            else:
+                QMessageBox.critical(self, tr.t("common_msg_error"), msg)
+                
+            self.upload_trans_btn.setEnabled(True)

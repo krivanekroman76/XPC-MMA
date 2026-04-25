@@ -1,7 +1,8 @@
+import os
 import requests
 import json
 import urllib.parse # Make sure this is imported at the top of your file
-    
+
 class FirebaseService:
     def __init__(self, language="en"):
         self.logger = None
@@ -221,6 +222,68 @@ class FirebaseService:
         except Exception as e:
             return False, str(e)
 
+    def upload_single_translation(self, file_path):
+        try:
+            # 1. Extract language code from filename (e.g., 'cs.json' -> 'cs')
+            lang_code = os.path.basename(file_path).replace('.json', '')
+            self.log(f"[DEBUG] Attempting to upload translation for language: {lang_code}")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # 2. Upload the translation dictionary
+            firestore_payload = {
+                "fields": {k: self._format_for_firestore(v) for k, v in data.items()}
+            }
+            url = f"{self.db_url}/Translations/{lang_code}"
+            
+            response = self._make_request("PATCH", url, json=firestore_payload)
+            
+            if response.status_code != 200:
+                self.log(f"[CRITICAL] Upload failed. Details: {response.json()}")
+                return False, f"Upload failed (Status {response.status_code})."
+            
+            self.log(f"[DEBUG] Main translation uploaded. Updating metadata...")
+
+            # ==========================================
+            # 3. NEW STEP: UPDATE THE METADATA VERSION
+            # ==========================================
+            meta_url = f"{self.db_url}/Translations/metadata"
+            
+            # Fetch current metadata to get the current version
+            get_meta = self._make_request("GET", meta_url)
+            current_version = 0
+            
+            if get_meta.status_code == 200:
+                parsed_meta = self._parse_firestore_document(get_meta.json())
+                # Get the current version, default to 0 if it doesn't exist yet
+                current_version = parsed_meta.get(lang_code, 0)
+                
+            new_version = current_version + 1
+            
+            # Prepare the update payload for just this language
+            meta_payload = {
+                "fields": {
+                    lang_code: self._format_for_firestore(new_version)
+                }
+            }
+            
+            # VERY IMPORTANT: Use updateMask so we don't overwrite other languages!
+            patch_meta_url = f"{meta_url}?updateMask.fieldPaths={lang_code}"
+            meta_resp = self._make_request("PATCH", patch_meta_url, json=meta_payload)
+            
+            if meta_resp.status_code == 200:
+                success_msg = f"Successfully uploaded {lang_code.upper()}! (v{new_version})"
+                self.log(f"[DEBUG] {success_msg}")
+                return True, success_msg
+            else:
+                self.log(f"[CRITICAL] Metadata update failed. Details: {meta_resp.json()}")
+                return False, "Translations uploaded, but metadata update failed!"
+
+        except Exception as e:
+            self.log(f"[CRITICAL] Exception during upload: {str(e)}")
+            return False, f"Upload failed: {str(e)}"
+        
     # --- LEAGUES AND RACES ---
     
     def create_league(self, name, abbreviation):
@@ -435,4 +498,82 @@ class FirebaseService:
             msg = self._t("err_db_update", error=str(e))
             self.log(msg)
             return False, msg
-        
+    
+    def delete_user(self, user_uid):
+        """Deletes a user account from Firestore."""
+        try:
+            url = f"{self.db_url}/Users/{user_uid}"
+            response = self._make_request("DELETE", url)
+            response.raise_for_status()
+            self.log(f"User {user_uid} deleted successfully")
+            return True, f"User deleted successfully"
+        except Exception as e:
+            msg = f"Failed to delete user: {str(e)}"
+            self.log(msg)
+            return False, msg
+    
+    def complete_race(self, league_id, race_id, race_name):
+        """Marks race as completed and sends FCM notification."""
+        try:
+            # Update race status to "completed"
+            url = f"{self.db_url}/Leagues/{league_id}/Races/{race_id}?updateMask.fieldPaths=status"
+            
+            firestore_payload = {
+                "fields": {
+                    "status": {"stringValue": "completed"}
+                }
+            }
+            
+            response = self._make_request("PATCH", url, json=firestore_payload)
+            response.raise_for_status()
+            
+            # Send FCM notification
+            topic_race = f"race_{league_id}_{race_id}".replace(" ", "_")
+            topic_league = f"league_{league_id}".replace(" ", "_")
+            
+            try:
+                import firebase_admin
+                from firebase_admin import messaging
+                
+                if not firebase_admin._apps:
+                    import os
+                    from firebase_admin import credentials
+                    cred_path = os.getenv('FIREBASE_KEY_PATH')
+                    if cred_path and os.path.exists(cred_path):
+                        cred = credentials.Certificate(cred_path)
+                        firebase_admin.initialize_app(cred)
+                
+                # Send to race topic
+                msg_race = messaging.Message(
+                    data={
+                        "type": "race_complete",
+                        "raceId": race_id,
+                        "leagueId": league_id,
+                        "raceName": race_name,
+                    },
+                    topic=topic_race,
+                )
+                messaging.send(msg_race)
+                
+                # Send to league topic
+                msg_league = messaging.Message(
+                    data={
+                        "type": "race_complete",
+                        "raceId": race_id,
+                        "leagueId": league_id,
+                        "raceName": race_name,
+                    },
+                    topic=topic_league,
+                )
+                messaging.send(msg_league)
+                
+                self.log(f"Race {race_name} completed with notifications sent")
+            except Exception as notif_error:
+                self.log(f"Warning: Notification failed but race marked complete: {notif_error}")
+            
+            return True, f"Race '{race_name}' completed successfully!"
+            
+        except Exception as e:
+            msg = f"Failed to complete race: {str(e)}"
+            self.log(msg)
+            return False, msg

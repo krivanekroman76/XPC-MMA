@@ -12,9 +12,9 @@ dependencies:
     sdk: flutter
   fluttertoast: ^9.0.0
   firebase_core:
-  firebase_database:
-  firebase_messaging: ^16.1.2  # pro push notifikace
-  shared_preferences: ^2.2.2    # pro ukládání stavu přepínačů (on/off)
+  cloud_firestore:
+  firebase_messaging: ^16.1.2  
+  shared_preferences: ^2.2.2
   provider:
   flutter_local_notifications: ^21.0.0
   cupertino_icons: ^1.0.8

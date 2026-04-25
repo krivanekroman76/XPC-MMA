@@ -11,7 +11,11 @@ class Translator:
         self.load_language(lang_code)
 
     def load_language(self, lang_code):
-        path = os.path.join("lang", f"{lang_code}.json")
+        # Get the directory of the current script (core/)
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        # Go up one level to the root, then into lang/
+        path = os.path.join(base_path, "..", "lang", f"{lang_code}.json")
+        
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 self.translations = json.load(f)
@@ -32,7 +36,7 @@ class Translator:
         return text
 
 # Initialization of the global translator
-tr = Translator("cs")
+tr = Translator("en")
 
 # ==========================================
 # UNIVERSAL LANGUAGE DROPDOWN

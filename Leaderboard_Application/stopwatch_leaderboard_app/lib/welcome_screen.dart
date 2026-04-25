@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'firebase_service.dart';
-import 'team_model.dart';
-import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'theme_provider.dart';
+import 'firebase_service.dart';
+import 'home_screen.dart'; // Ensure this contains your RaceLeaderboard class
+import 'settings_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -13,181 +15,170 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  bool _masterNotifications = false;
+  String? _savedLeague;
+  bool _isLoading = true;
+
+  // Subscription States
+  Set<String> _subscribedRaces = {};
+  bool _isGlobalSubscribed = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMasterNotificationState();
+    _loadSavedData();
   }
 
-  void _loadMasterNotificationState() {
+  // Load saved league and notification preferences on startup
+  Future<void> _loadSavedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final league = prefs.getString('saved_league');
+
+    // Debugging line
+    print("Loading Web Data: League: $league, Global: ${prefs.getBool('global_$league')}");
+
     setState(() {
-      _masterNotifications = FirebaseService().isMasterNotificationEnabled;
+      _subscribedRaces = (prefs.getStringList('subscribed_races') ?? []).toSet();
+      if (league != null) {
+        _isGlobalSubscribed = prefs.getBool('global_$league') ?? false;
+      }
+      _savedLeague = league;
+      _isLoading = false;
     });
+  }
+
+  // Save a new league and reset global bell for that league context
+  Future<void> _setLeague(String league) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_league', league);
+
+    setState(() {
+      _savedLeague = league;
+      _isGlobalSubscribed = prefs.getBool('global_$league') ?? false;
+    });
+
+    if (Scaffold.of(context).isDrawerOpen) {
+      Navigator.pop(context);
+    }
+  }
+
+  // Handle Global Bell Toggle
+  Future<void> _toggleGlobalNotification() async {
+    if (_savedLeague == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    // Clean topic name (FCM doesn't like spaces)
+    String topic = "league_${_savedLeague!.replaceAll(' ', '_')}";
+
+    // Ask for permission (Required for Web/iOS)
+    NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      setState(() => _isGlobalSubscribed = !_isGlobalSubscribed);
+
+      if (_isGlobalSubscribed) {
+        await FirebaseMessaging.instance.subscribeToTopic(topic);
+      } else {
+        await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+      }
+
+      await prefs.setBool('global_$_savedLeague', _isGlobalSubscribed);
+    }
+  }
+
+  // Handle Individual Race Bell Toggle
+  Future<void> _toggleRaceNotification(String race) async {
+    final prefs = await SharedPreferences.getInstance();
+    String topic = "race_${_savedLeague}_$race".replaceAll(' ', '_');
+
+    NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      setState(() {
+        if (_subscribedRaces.contains(race)) {
+          _subscribedRaces.remove(race);
+          FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+        } else {
+          _subscribedRaces.add(race);
+          FirebaseMessaging.instance.subscribeToTopic(topic);
+        }
+      });
+      await prefs.setStringList('subscribed_races', _subscribedRaces.toList());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final colorScheme = Theme.of(context).colorScheme; // Získáme aktuální barvy
+    final tp = Provider.of<ThemeProvider>(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(themeProvider.translate('XPC-MMA Závody', 'XPC-MMA Races')),
+        title: Text(
+          _savedLeague == null
+              ? tp.translateKey('league_selection')
+              : '${tp.translateKey('races_label')} $_savedLeague',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         elevation: 0,
         actions: [
-          // Výběr barvy
-          PopupMenuButton<Color>(
-            icon: Icon(Icons.palette, color: colorScheme.primary),
-            onSelected: (color) => themeProvider.setColor(color),
-            itemBuilder: (context) => themeProvider.availableColors.map((color) => PopupMenuItem(
-              value: color,
-              child: Container(
-                width: 24, height: 24,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          // GLOBAL BELL: Only appears when a league is selected
+          if (_savedLeague != null)
+            IconButton(
+              icon: Icon(
+                _isGlobalSubscribed ? Icons.notifications_active : Icons.notifications_none,
+                color: _isGlobalSubscribed ? Colors.amber : null,
               ),
-            )).toList(),
-          ),
-          TextButton(
-            onPressed: () => themeProvider.toggleLanguage(),
-            child: Text(
-              themeProvider.locale.languageCode.toUpperCase(),
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.primary),
+              onPressed: _toggleGlobalNotification,
+              tooltip: "League Notifications",
             ),
-          ),
           IconButton(
-            icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => themeProvider.toggleTheme(),
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
           ),
         ],
       ),
-      body: Column(
+      drawer: _buildDrawer(tp, colorScheme),
+      body: _savedLeague == null ? _buildLeagueSelection(tp) : _buildRaceSelection(tp, colorScheme),
+    );
+  }
+
+  Widget _buildDrawer(ThemeProvider tp, ColorScheme colorScheme) {
+    return Drawer(
+      child: Column(
         children: [
-          Container(
-            color: colorScheme.primary.withOpacity(0.1),
-            child: SwitchListTile(
-              title: Text(themeProvider.translate('Odebírat všechny závody', 'Subscribe to all races'), style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(themeProvider.translate('Dostávat upozornění na každý výsledek.', 'Get notified for every result.')),
-              value: _masterNotifications,
-              activeColor: colorScheme.primary,
-              onChanged: (bool value) async {
-                if (value) {
-                  bool success = await FirebaseService().init();
-                  if (!success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(themeProvider.translate('Chyba: Prohlížeč zablokoval spojení.', 'Error: Connection blocked by browser.')),
-                        backgroundColor: Colors.red,
-                        duration: const Duration(seconds: 4),
-                      ),
-                    );
-                    return;
-                  }
-                }
-                await FirebaseService().setMasterNotification(value);
-                setState(() {
-                  _masterNotifications = value;
-                });
-              },
+          DrawerHeader(
+            decoration: BoxDecoration(color: colorScheme.primary),
+            child: Center(
+              child: Text(tp.translateKey('change_league'),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
             ),
           ),
-          const Divider(height: 1),
           Expanded(
             child: StreamBuilder<List<String>>(
-              stream: FirebaseService().getRacesStream(),
+              stream: FirebaseService().getLeaguesStream(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
-
-                final races = snapshot.data ?? [];
-                if (races.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.flag_outlined, size: 80, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        Text(
-                            themeProvider.translate('Momentálně nejsou vypsány\nžádné závody.', 'Currently there are no\nraces available.'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 18, color: Colors.grey)
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final leagues = snapshot.data!;
                 return ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: races.length,
+                  itemCount: leagues.length,
                   itemBuilder: (context, index) {
-                    final raceName = races[index];
-                    bool isSubscribed = FirebaseService().isRaceNotificationEnabled(raceName);
-
-                    return StreamBuilder<RaceSettings>(
-                        stream: FirebaseService().getSettingsStream(raceName),
-                        builder: (context, settingsSnapshot) {
-                          bool isFinished = settingsSnapshot.data?.isFinished ?? false;
-
-                          return Card(
-                            elevation: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                              leading: CircleAvatar(
-                                backgroundColor: isFinished ? Colors.grey : colorScheme.primary,
-                                child: Icon(isFinished ? Icons.flag : Icons.directions_run, color: Colors.white),
-                              ),
-                              title: Text(raceName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              subtitle: Text(isFinished
-                                  ? themeProvider.translate('Závod byl ukončen', 'Race is finished')
-                                  : themeProvider.translate('Klikněte pro výsledky', 'Click for results')),
-                              trailing: isFinished
-                                  ? const SizedBox()
-                                  : _masterNotifications
-                                  ? IconButton(
-                                icon: Icon(Icons.notifications_active, color: colorScheme.primary),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(themeProvider.translate('Už odebíráte všechny závody.', 'You are already subscribed to all.'))));
-                                },
-                              )
-                                  : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      isSubscribed ? Icons.notifications_active : Icons.notifications_none,
-                                      color: isSubscribed ? colorScheme.primary : Colors.grey,
-                                    ),
-                                    onPressed: () async {
-                                      if (!isSubscribed) {
-                                        bool success = await FirebaseService().init();
-                                        if (!success) return;
-                                      }
-                                      await FirebaseService().setRaceNotification(raceName, !isSubscribed);
-                                      setState(() {});
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                              content: Text(!isSubscribed ? themeProvider.translate('Odběr zapnut', 'Subscribed') : themeProvider.translate('Odběr vypnut', 'Unsubscribed')),
-                                              backgroundColor: !isSubscribed ? Colors.green : Colors.grey,
-                                              duration: const Duration(seconds: 2)
-                                          )
-                                      );
-                                    },
-                                  ),
-                                  const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                                ],
-                              ),
-                              onTap: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => RaceLeaderboard(initialRace: raceName)));
-                              },
-                            ),
-                          );
-                        }
+                    final league = leagues[index];
+                    return ListTile(
+                      leading: const Icon(Icons.emoji_events),
+                      title: Text(league, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      selected: _savedLeague == league,
+                      selectedColor: colorScheme.primary,
+                      onTap: () => _setLeague(league),
                     );
                   },
                 );
@@ -196,6 +187,101 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLeagueSelection(ThemeProvider tp) {
+    return StreamBuilder<List<String>>(
+      stream: FirebaseService().getLeaguesStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        final leagues = snapshot.data!;
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: leagues.length,
+          itemBuilder: (context, index) {
+            return Card(
+              elevation: 4,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: const Icon(Icons.emoji_events, size: 40, color: Colors.amber),
+                title: Text(leagues[index], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () => _setLeague(leagues[index]),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRaceSelection(ThemeProvider tp, ColorScheme colorScheme) {
+    return StreamBuilder<List<String>>(
+      stream: FirebaseService().getRacesStream(_savedLeague!),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        final races = snapshot.data!;
+        if (races.isEmpty) {
+          return Center(child: Text(tp.translateKey('no_races'), style: const TextStyle(fontSize: 18)));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: races.length,
+          itemBuilder: (context, index) {
+            final race = races[index];
+            bool isRaceSubscribed = _subscribedRaces.contains(race);
+
+            return Card(
+              elevation: 2,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                contentPadding: const EdgeInsets.only(left: 16, right: 8),
+                leading: Icon(Icons.flag, size: 30, color: colorScheme.primary),
+                title: Text(race, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // INDIVIDUAL RACE BELL
+                    IconButton(
+                      icon: Icon(
+                        (_isGlobalSubscribed || isRaceSubscribed)
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
+                        color: (_isGlobalSubscribed || isRaceSubscribed) ? colorScheme.primary : Colors.grey,
+                      ),
+                      onPressed: () => _toggleRaceNotification(race),
+                    ),
+                    const Icon(Icons.play_arrow),
+                  ],
+                ),
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('active_race', race);
+
+                  if (mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RaceLeaderboard(
+                            initialLeague: _savedLeague!,
+                            initialRace: race
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
