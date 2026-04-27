@@ -432,9 +432,9 @@ For Flutter **super admin** needs to publish new language into firestore using `
 
 ## 📝 License
 
-To view and manage the license for this project:
-- Check the `LICENSE` file in the repository root
-- Visit [GitHub License Documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository)
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file in the repository root for details.
+
+The MIT License allows you to freely use, modify, and distribute this software, provided you include the original license notice.
 
 ---
 
