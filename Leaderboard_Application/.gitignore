@@ -2,3 +2,8 @@
 .env
 serviceAccountKey.json
 firebase-config.json
+dist
+build
+core/__pycache__
+GUI_windows/__pycache__
+__pycache__

@@ -1,9 +1,20 @@
 {
+  "valid_attempt": "Platný pokus",
   "invalid_attempt": "Neplatný pokus",
   "time_improved": "Zlepšení času!",
   "time_worse": "Horší čas",
+
+  "reason_np_early_start": "Předčasný start",
+  "reason_np_hose": "Nezapojená proudnice",
+  "reason_np_line": "Přešlap na čáře",
   "reason_nozzle": "Nezapojená proudnice",
   "reason_line": "Přešlap na čáře",
+
+  "reason_pen_none": "Bez penalizace",
+  "reason_pen_base": "Chyba na základně",
+  "reason_pen_suction": "Špatné sání",
+  "reason_other": "Jiné...",
+
   "settings_title": "Nastavení",
   "appearance": "Vzhled",
   "dark_mode": "Tmavý režim",
@@ -31,13 +42,6 @@
   "st": "ST",
   "team": "TÝM",
   "result": "VÝSLEDEK",
-  "notif_on":  "Notifickace Zaptnuty",
-  "notif_off": "Notifikace Vypnuty",
-  "reason_np_early_start": "Předčasný start",
-  "reason_np_hose": "Nezapojená proudnice",
-  "reason_np_line": "Přešlap na čáře",
-  "reason_pen_none": "Bez penalizace",
-  "reason_pen_base": "Chyba na základně",
-  "reason_pen_suction": "Špatné sání",
-  "reason_other": "Jiné..."
+  "notif_on":  "Notifikace Zapnuty",
+  "notif_off": "Notifikace Vypnuty"
 }

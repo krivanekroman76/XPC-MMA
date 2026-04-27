@@ -12,12 +12,14 @@ from PySide6.QtGui import QColor
 from core.translate import tr 
 from core.sport_logic import get_sport_logic
 from .confirm import AttemptConfirmDialog
+#from core.firebase_service import FirebaseService
 
 class TimingPage(QWidget):
     def __init__(self, db_service, dashboard_parent):
         super().__init__()
         self.db = db_service
         self.dashboard = dashboard_parent
+        #self.firebase_service = firebase_service
         
         self.is_hardware_connected = False
         self.current_start_list = []
@@ -483,8 +485,9 @@ class TimingPage(QWidget):
             race_id = self.race_combo.currentData() or "UNKNOWN_RACE"
             team_name = run_obj.get("team", "Unknown Team")
 
+            # Launch the notification in a background thread so the GUI stays responsive
             threading.Thread(
-                target=self.trigger_push_notification, 
+                target=self.db.trigger_push_notification,
                 args=(race_id, league_id, team_name, push_reason_key, is_np_flag, title_key),
                 daemon=True
             ).start()

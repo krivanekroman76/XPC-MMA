@@ -8,8 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QFileDialog, QInputDialog, QListWidget, 
                                QAbstractItemView, QGroupBox, QScrollArea)
 from PySide6.QtCore import Qt, QTimer
-#from config_manager import ConfigManager
-from core.translate import tr
+from core import ConfigManager, tr
 
 PRESETS_FILE = "sport_presets.json"
 CATEGORIES_FILE = "categories.json"

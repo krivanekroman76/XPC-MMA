@@ -325,7 +325,8 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
 
         if (currentSort == SortType.startNo) {
           // 1. Extract the base sequence of categories from Firestore run_order
-          // E.g., translates ["Muži - 1. Pokus", "Ženy - 1. Pokus"] into ["Muži", "Ženy"]
+          // E.g., translates
+          // ["Muži - 1. Pokus", "Ženy - 1. Pokus"] into ["Muži", "Ženy"]
           List<String> baseCategorySequence = [];
           for (String block in settings.runOrder) {
             String cat = block.split(' - ').first.trim();
@@ -334,7 +335,8 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
             }
           }
 
-          // Fallback just in case run_order is completely empty in Firestore
+          // Fallback just in case run_order
+          // is completely empty in Firestore
           if (baseCategorySequence.isEmpty) {
             baseCategorySequence = ["Muži", "Ženy", "Dorost"];
           }

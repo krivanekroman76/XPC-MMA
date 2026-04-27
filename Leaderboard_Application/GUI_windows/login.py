@@ -7,16 +7,9 @@ from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtCore import Qt
 
 # Import your custom Firebase class
-from core.firebase_service import FirebaseService
+from core import FirebaseService, ConfigManager, tr, LanguageSelector
 
 from GUI_windows.dashboard import DashboardWindow
-
-#from config_manager import ConfigManager
-        
-# ==========================================
-# IMPORT TRANSLATOR
-# ==========================================
-from core.translate import tr, LanguageSelector
 
 # ==========================================
 # LOGIN WINDOW

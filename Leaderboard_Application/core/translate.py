@@ -4,8 +4,7 @@ import os
 from PySide6.QtWidgets import QComboBox
 from PySide6.QtCore import Qt
 
-# 1. IMPORT YOUR CONFIG MANAGER
-#from config_manager import ConfigManager
+from core.config_manager import ConfigManager
 
 class Translator:
     def __init__(self, lang_code="cs"):

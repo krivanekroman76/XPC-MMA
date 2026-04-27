@@ -1,11 +1,21 @@
-# Leaderboard Application
+# [Leaderboard Application](https://github.com/krivanekroman76/XPC-MMA/tree/main/Leaderboard_Application)
 
-A comprehensive race management and visualization system consisting of two integrated applications: a Python desktop GUI for race control and timing management, and a Flutter cross-platform app for real-time leaderboard display.
+![Python](https://img.shields.io/badge/Python-3.9+-blue?style=flat-square)
+![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?style=flat)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+![Firebase](https://img.shields.io/badge/Firebase-Ready-orange?style=flat)
+
+A comprehensive race management and visualization system consisting of two integrated applications: a Python desktop GUI for race control and timing management, and a Flutter cross-platform app for real-time leaderboard display. 
+
+Title is used as repository link.
 
 ## 📋 Table of Contents
 
+- [Quick Start](#quick-start)
 - [Overview](#overview)
 - [Features](#features)
+- [Feature Comparison](#feature-comparison)
+- [Screenshots](#screenshots)
 - [Project Structure](#project-structure)
 - [System Requirements](#system-requirements)
 - [Installation](#installation)
@@ -13,6 +23,34 @@ A comprehensive race management and visualization system consisting of two integ
 - [Configuration](#configuration)
 - [Building & Deployment](#building--deployment)
 - [Supported Languages](#supported-languages)
+
+---
+
+## 🚀 Quick Start
+
+**For Python App Users:**
+1. Get `Leaderboard.app` from your admin
+2. Place alongside `settings.json` and `firebase-config.json`
+3. Launch the app and log in
+
+**For Flutter App Users:**
+1. Open the provided web URL or install the mobile app
+2. Browse leagues and select a race
+3. View real-time leaderboard (no login required)
+
+**For Developers:**
+```bash
+# Python development
+python3 main.py
+
+# Flutter web development  
+cd stopwatch_leaderboard_app && flutter run -d web
+```
+
+**For Deployment:**
+- See [Installation](#installation) for initial setup
+- See [Building & Deployment](#building--deployment) for production builds
+- See [BUILD_GUIDE.md](BUILD_GUIDE.md) for detailed instructions
 
 ---
 
@@ -33,6 +71,17 @@ The Leaderboard Application is a dual-application system designed for sport even
 - Database: Firebase Firestore
 - Platforms: Web, iOS, Android
 - Notifications: Firebase Cloud Messaging
+
+### System Architecture
+
+![System Flow Diagram](img/system_flow.png)
+
+**Legend (Czech text in image):**
+- **UART komunikace** = UART Communication (serial connection to stopwatch)
+- **Obslužná aplikace (python)** = Desktop Application (Python) - Race management and timing control
+- **Mobilní aplikace (flutter)** = Mobile Application (Flutter) - Public leaderboard display
+
+**Data Flow:** Electronic Stopwatch → Python App (UART) → Firebase → Flutter App (Web/Mobile)
 
 ---
 
@@ -86,7 +135,80 @@ The Leaderboard Application is a dual-application system designed for sport even
 
 ---
 
-## 📁 Project Structure
+## 📊 Feature Comparison
+
+| Feature | Python App | Flutter App |
+|---------|-----------|-------------|
+| **Race Management** | ✅ Full control | ❌ View only |
+| **Timing Control** | ✅ Stopwatch integration | ❌ N/A |
+| **Authentication** | ✅ Required (role-based) | ❌ Public access |
+| **Leaderboard Display** | ✅ Internal view | ✅ Real-time public display |
+| **Cross-Platform** | ❌ macOS only (for now) | ✅ Web, iOS, Android |
+| **User Management** | ✅ Super Admin only | ❌ N/A |
+| **Notifications** | ❌ No | ✅ Push notifications + toasts |
+| **Installation** | ✅ .app bundle | ✅ No installation (web) |
+
+---
+
+## 🎨 Screenshots
+
+> **Note on Languages**: The screenshots below include Czech text to demonstrate the multi-language integration (English and Czech translations). If desired, we can retake these screenshots with full English text in the future.
+
+### Python Desktop Application
+
+**Login & Dashboard**
+
+The application starts with a secure login screen and provides role-based dashboard access for race management.
+
+| | |
+|---|---|
+| ![Admin Tools](img/admin_page.png) | ![Dashboard Overview](img/league_page.png) |
+
+**Race Management**
+
+Manage race schedules and timing information with intuitive forms and controls.
+
+| | |
+|---|---|
+| ![Race Configuration](img/race_page.png) | ![Timing Controls](img/timing_page.png) |
+
+**Leaderboard Views**
+
+Real-time leaderboard display with multiple filtering options - view by category, starting positions, or final standings.
+
+| | | |
+|---|---|---|
+| ![Starting Lineup](img/leaderboard_start_no.png) | ![Winners - All Categories](img/leaderboard_win_all.png) | ![Winners - Men's Category](img/leaderboard_win_men.png) |
+
+### Flutter Leaderboard Application
+
+**League & Race Selection**
+
+Browse available leagues and select races to view their leaderboards. Get notifications about race updates.
+
+| | | |
+|---|---|---|
+| ![Leagues List](img/flutter_leagues.png) | ![Races View](img/flutter_races.png) | ![Notifications](img/flutter_notification.png) |
+
+**Leaderboard Display**
+
+View real-time leaderboards in multiple layouts with responsive design that adapts to landscape orientation.
+
+| | | |
+|---|---|---|
+| ![Leaderboard Portrait](img/flutter_landscape.png) | ![Landscape Layout](img/flutter_landscape_start_no_all.png) | ![Winners Display](img/flutter_landscape_men_win.png) |
+
+**Settings & Customization**
+
+Customize the app theme, select your preferred language, and manage notifications.
+
+| | |
+|---|---|
+| ![Settings Panel](img/flutter_settings.png) | ![Notifications & Toast Messages](img/flutter_toast.png) |
+
+---
+
+## �📁 Project Structure
 
 ```
 Leaderboard_Application/
@@ -346,25 +468,71 @@ flutter run -d ios
 
 ### Python Application Deployment
 
-**Create Standalone macOS .app Bundle:**
+**Step 1: Prepare Configuration Files**
+
+Before building, ensure these files exist in the project root. The build script will automatically bundle them inside the .app:
+
+- **firebase-config.json** - Firebase credentials (create if missing)
+  ```json
+  {
+      "apiKey": "YOUR_API_KEY",
+      "projectId": "YOUR_PROJECT_ID",
+      "storageBucket": "YOUR_STORAGE_BUCKET"
+  }
+  ```
+
+- **settings.json** - User preferences (create if missing)
+  ```json
+  {
+      "theme": "dark-blue",
+      "remember_email": false,
+      "saved_email": "",
+      "lang": "cs"
+  }
+  ```
+
+- **sport_presets.json** - Sport configurations (required, should already exist)
+- **categories.json** - Category definitions (required, should already exist)
+- **lang/** - Language files directory (required, should contain en.json, cs.json, etc.)
+
+**Step 2: Build the .app Bundle**
+
+Run the automated build script:
 ```bash
 ./build.sh
 ```
 
-This script:
-- Verifies PyInstaller installation
-- Validates all dependencies
-- Creates `dist/Leaderboard.app` bundle
+This will:
+- ✅ Check PyInstaller and dependencies
+- ✅ Create `dist/StopwatchControl.app`
+- ✅ **Automatically copy all config files inside the .app bundle**
+- ✅ **Automatically copy lang/ and themes/ directories inside the .app**
+- ✅ Verify the build was successful
 
-**Configuration Files for Deployment:**
-Place these files next to the .app bundle:
-- `settings.json`
-- `firebase-config.json`
-- `sport_presets.json`
-- `categories.json`
-- `lang/` directory with translation files
+> **Note:** Files are bundled inside the .app bundle, making it completely self-contained. If any config files don't exist, they will be skipped (with a note in the output) - you should create them in the project root before building.
 
-See [BUILD_GUIDE.md](BUILD_GUIDE.md) for detailed deployment instructions.
+**Step 3: Test**
+
+```bash
+# Test the built app
+open dist/StopwatchControl.app
+```
+
+**ConfigManager Behavior:**
+
+The app uses ConfigManager to intelligently locate resources:
+- **First**: Looks inside the .app bundle (Contents/Resources/) for bundled assets
+- **Second**: Looks next to the .app for user overrides
+- **Fallback**: Uses development directory paths
+
+This means:
+- ✅ Users can place an updated `settings.json` next to the .app to override bundled settings
+- ✅ Users can place new translation files next to the .app
+- ✅ Firebase credentials can be updated by placing a new config file next to the .app
+
+Best approach is to open .app using right click and edit the files inside
+
+For detailed build troubleshooting, see [BUILD_GUIDE.md](BUILD_GUIDE.md).
 
 ### Flutter Application Deployment
 
@@ -450,10 +618,19 @@ For issues, questions, or contributions, please contact the development team.
 
 ---
 
-## 🎨 Screenshots & Documentation
+## 📋 Future Improvements (TODO)
 
-GUI screenshots and detailed documentation images are available in the `img/` folder.
+The following features and sections are planned for future releases:
 
+- [ ] **Troubleshooting Section** - Common Firebase errors, Flutter build issues, and Python dependency problems with solutions
+- [ ] **Contributing Guidelines** - How to report issues, submit pull requests, and code style guidelines
+- [ ] **FAQ Section** - Frequently asked questions (Firebase requirements, language support, concurrent user limits)
+- [ ] **Demo/Video Links** - Live demo URL for Flutter web version and walkthrough videos
+- [ ] **Requirements Checklist** - Clear breakdown of what's included vs. what users need to set up
+- [ ] **Admin Setup Guide** - Step-by-step guide for Super Admins to configure the system for the first time
+- [ ] **API Documentation** - For developers extending the application
+- [ ] **Internationalization Examples** - How to add more languages beyond English/Czech
+- [ ] **Fix minor bugs** like NP toasts
 ---
 
 **Last Updated**: April 27, 2026

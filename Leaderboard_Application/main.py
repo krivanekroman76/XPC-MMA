@@ -2,7 +2,7 @@ import sys
 import os
 from PySide6.QtWidgets import QApplication
 
-from core.config_manager import ConfigManager
+from core import ConfigManager
 from GUI_windows.login import LoginWindow
 
 # Add this: Force the app to use its own location as the starting point

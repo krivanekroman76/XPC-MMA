@@ -85,13 +85,16 @@ class Team {
 
 // 1. Update the getter for the main Result column
   String get formattedTime {
+    // If the time is 999999, it means the team does not have a valid recorded time
     if (bestTime >= 999999.0) {
-      // If the team has finished all runs (DONE) or is explicitly marked as NP, show NP instead of N/A
-      if (status == 'DONE' || status == 'NP') {
-        return "NP";
+      // If the status is 'IDLE', 'PREPARING', or 'WAITING', the team has not started yet
+      if (status == 'IDLE' || status == 'PREPARING' || status == 'WAITING') {
+        return "--:---";
       }
-      return "N/A";
+      // If they have already finished (DONE) or are marked as NP, show "NP"
+      return "NP";
     }
+    // If they have a valid time, format it to 3 decimal places
     return bestTime.toStringAsFixed(3);
   }
 

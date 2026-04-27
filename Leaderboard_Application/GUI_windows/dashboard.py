@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
                                QStackedWidget, QFrame, QLabel, QSlider)
 from PySide6.QtCore import Qt
 
-from core.translate import tr, LanguageSelector
+from core import tr, LanguageSelector
 
 # Here you will gradually uncomment other pages as you create them
 from GUI_windows.admin_tools import AdminToolsPage

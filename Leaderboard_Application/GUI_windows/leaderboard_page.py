@@ -1,3 +1,4 @@
+import re
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QPushButton, QComboBox, QTableWidget, QTableWidgetItem, 
                                QHeaderView, QTabWidget, QFrame, QCheckBox)
@@ -11,6 +12,7 @@ class LeaderboardPage(QWidget):
         self.db = db_service
         self.dashboard = dashboard_parent
         self.current_results_data = []
+        self.race_settings = {}
         
         # Auto-refresh timer
         self.refresh_timer = QTimer()
@@ -23,7 +25,6 @@ class LeaderboardPage(QWidget):
         """Automatically refresh dropdowns and data when the page becomes visible."""
         super().showEvent(event)
         self.load_leagues()
-        # Start auto-refresh timer (every 5 seconds)
         self.refresh_timer.start(5000)
     
     def hideEvent(self, event):
@@ -54,39 +55,51 @@ class LeaderboardPage(QWidget):
         self.combo_race.currentIndexChanged.connect(self.load_results)
         top_layout.addWidget(self.combo_race)
 
-        top_layout.addSpacing(20)
+        top_layout.addSpacing(30)
 
-        self.lbl_sort_label = QLabel("🔄")
-        self.lbl_sort_label.setStyleSheet("font-size: 16px; margin-right: 5px;")
-        top_layout.addWidget(self.lbl_sort_label)
+        # Updated Icons: List (Start Order) vs Trophy (Rank)
+        self.lbl_sort_start = QLabel("☰") 
+        self.lbl_sort_start.setStyleSheet("font-size: 18px; color: #a6adc8;")
+        top_layout.addWidget(self.lbl_sort_start)
         
-        # Create a toggle switch-style widget
+        # Gold themed toggle switch
         self.sort_toggle = QCheckBox()
+        self.sort_toggle.setCursor(Qt.PointingHandCursor)
         self.sort_toggle.setStyleSheet("""
             QCheckBox {
-                width: 50px;
-                height: 30px;
-                background-color: #313244;
-                border-radius: 15px;
-                margin: 0px;
-                padding-left: 5px;
+                spacing: 0px;
             }
             QCheckBox::indicator {
-                width: 26px;
-                height: 26px;
-                border-radius: 13px;
-                background-color: #89b4fa;
-                border: 2px solid #45475a;
+                width: 45px;
+                height: 22px;
+                background-color: #313244;
+                border-radius: 11px;
+                border: 1px solid #45475a;
             }
-            QCheckBox:checked::indicator {
-                background-color: #a6e3a1;
+            QCheckBox::indicator:unchecked {
+                image: none;
+                background-color: #313244;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #f9e2af; /* GOLD BACKGROUND */
+            }
+            /* The actual moving slider handle */
+            QCheckBox::indicator:unchecked {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #89b4fa, stop:0.4 #89b4fa, stop:0.41 #313244, stop:1 #313244);
+                border-radius: 11px;
+            }
+            QCheckBox::indicator:checked {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #313244, stop:0.59 #313244, stop:0.6 #45475a, stop:1 #45475a);
+                image: none;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #313244, stop:0.59 #313244, stop:0.6 #11111b, stop:1 #11111b);
+                background-color: #f9e2af; 
             }
         """)
         self.sort_toggle.stateChanged.connect(self.on_sort_toggle_changed)
         top_layout.addWidget(self.sort_toggle)
         
         self.lbl_sort_end = QLabel("🏆")
-        self.lbl_sort_end.setStyleSheet("font-size: 16px; margin-left: 5px;")
+        self.lbl_sort_end.setStyleSheet("font-size: 18px; color: #f9e2af;")
         top_layout.addWidget(self.lbl_sort_end)
 
         top_layout.addStretch()
@@ -107,21 +120,17 @@ class LeaderboardPage(QWidget):
         self.lbl_league.setText(tr.t("common_lbl_league"))
         self.lbl_race.setText(tr.t("common_lbl_race"))
         self.btn_refresh.setText(tr.t("lb_btn_refresh"))
-        
         self.refresh_tables()
     
     def on_sort_toggle_changed(self):
-        """Handle sort toggle state change."""
         self.refresh_tables()
 
     def load_leagues(self):
         self.combo_league.blockSignals(True)
         self.combo_league.clear()
-        
         all_leagues = self.db.get_all_leagues()
         for lg in all_leagues:
             self.combo_league.addItem(f"{lg.get('abbreviation', '')} - {lg.get('name', 'Unknown')}", lg.get('id'))
-            
         self.combo_league.blockSignals(False)
         self.load_races()
 
@@ -129,80 +138,50 @@ class LeaderboardPage(QWidget):
         league_id = self.combo_league.currentData()
         self.combo_race.blockSignals(True)
         self.combo_race.clear()
-        
         if league_id:
             races = self.db.get_races_for_league(league_id)
             for race in races:
                 self.combo_race.addItem(race.get('name', tr.t("timing_unknown_race")), race.get('id'))
-                
         self.combo_race.blockSignals(False)
         self.load_results()
 
     def load_results(self):
         league_id = self.combo_league.currentData()
         race_id = self.combo_race.currentData()
-        
         if not league_id or not race_id:
             self.tabs.clear()
             self.current_results_data = []
             return
 
-        raw_teams = self.db.get_race_start_list(league_id, race_id)
+        race_doc = self.db.get_race(league_id, race_id)
+        if not race_doc: return
+        
+        self.race_settings = race_doc.get("settings", {})
+        raw_teams = race_doc.get("start_list", [])
+        
         self.current_results_data = []
-
         for team_data in raw_teams:
-            team_str = str(team_data.get("team", ""))
-            start_no = team_data.get("start_no", 0) 
-            team_name = team_str
-            
-            # Legacy format safety check
-            if ". " in team_str:
-                parts = team_str.split(". ", 1)
-                if parts[0].isdigit():
-                    if not start_no: start_no = int(parts[0])
-                    team_name = parts[1]
-
-            # Parse Overall Team Status
+            # Basic parsing logic
             raw_state = str(team_data.get("status", team_data.get("state", "WAITING"))).upper()
-            if raw_state in ["DONE", "VALID", "PLATNÝ", "HOTOVO", "FINISHED"]:
-                status = "DONE"
-            elif raw_state in ["NP", "NEPLATNÝ", "INV"]:
-                status = "NP"
-            elif raw_state in ["PREPARING", "READY"]:
-                status = "PREPARING"
-            else:
-                status = "WAITING"
+            if raw_state in ["DONE", "VALID", "PLATNÝ", "HOTOVO", "FINISHED"]: status = "DONE"
+            elif raw_state in ["NP", "NEPLATNÝ", "INV"]: status = "NP"
+            elif raw_state in ["PREPARING", "READY"]: status = "PREPARING"
+            else: status = "WAITING"
 
-            # Parse Top/Best Result Time
             best_time_raw = team_data.get("best_time", team_data.get("result_time", team_data.get("final_time")))
             best_time_val = None
-            
             if status == "DONE" and best_time_raw not in [None, "NP", "--.---", "", "None"]:
-                try:
-                    best_time_val = float(str(best_time_raw).replace(",", "."))
-                except ValueError:
-                    best_time_val = None
-
-            best_time_display = str(best_time_raw) if best_time_raw else "--.---"
-
-            # Parse Attempts Data (with fallback for legacy single-run rows)
-            attempts = team_data.get("attempts", [])
-            if not attempts and ("time_left" in team_data or "base_time" in team_data):
-                attempts = [{
-                    "time_left": team_data.get("time_left", team_data.get("base_time")),
-                    "time_right": team_data.get("time_right", "--.---"),
-                    "result_time": team_data.get("result_time", team_data.get("final_time")),
-                    "state": status
-                }]
+                try: best_time_val = float(str(best_time_raw).replace(",", "."))
+                except: best_time_val = None
 
             self.current_results_data.append({
-                "start_no": start_no,
-                "team": team_name,
+                "start_no": team_data.get("start_no", 0),
+                "team": team_data.get("team", "Unknown"),
                 "category": team_data.get("category", "-"),
                 "status": status,
                 "best_time_val": best_time_val,
-                "best_time_str": best_time_display,
-                "attempts": attempts
+                "best_time_str": str(best_time_raw) if best_time_raw else "--.---",
+                "attempts": team_data.get("attempts", [])
             })
 
         self.refresh_tables()
@@ -212,158 +191,115 @@ class LeaderboardPage(QWidget):
             self.tabs.clear()
             return
 
-        # sort_by_placement is True when toggle is checked (checked = placement order)
-        sort_by_placement = self.sort_toggle.isChecked()
+        # SAVE CURRENT TAB INDEX
+        current_tab_idx = self.tabs.currentIndex()
         
-        # Determine the maximum number of attempts any team has taken to build columns
-        max_attempts = 1
-        for data in self.current_results_data:
-            if len(data["attempts"]) > max_attempts:
-                max_attempts = len(data["attempts"])
-
-        categories = ["ALL"] + sorted(list(set(item["category"] for item in self.current_results_data)))
+        sort_by_placement = self.sort_toggle.isChecked()
+        run_order = self.race_settings.get("run_order", [])
+        unique_categories = sorted(list(set(item["category"] for item in self.current_results_data)))
+        categories_to_render = ["ALL"] + unique_categories
+        
         self.tabs.clear()
 
-        for category in categories:
-            if category == "ALL":
-                cat_data = self.current_results_data
+        for category_tab in categories_to_render:
+            if category_tab == "ALL":
+                tab_data_pool = self.current_results_data
                 tab_title = tr.t("lb_tab_all")
             else:
-                cat_data = [item for item in self.current_results_data if item["category"] == category]
-                tab_title = category
+                tab_data_pool = [item for item in self.current_results_data if item["category"] == category_tab]
+                tab_title = category_tab
 
-            # Sorting Logic
+            # --- SORTING ---
             if sort_by_placement:
-                valid_runs = sorted([d for d in cat_data if d["best_time_val"] is not None], key=lambda x: x["best_time_val"])
-                np_runs = [d for d in cat_data if d["status"] == "NP" or str(d["best_time_str"]).upper() == "NP"]
-                other_runs = [d for d in cat_data if d not in valid_runs and d not in np_runs]
-                sorted_data = valid_runs + np_runs + other_runs
+                valid_runs = sorted([d for d in tab_data_pool if d["best_time_val"] is not None], key=lambda x: x["best_time_val"])
+                np_runs = [d for d in tab_data_pool if d["status"] == "NP"]
+                others = [d for d in tab_data_pool if d not in valid_runs and d not in np_runs]
+                sorted_data = valid_runs + np_runs + others
             else:
-                sorted_data = sorted(cat_data, key=lambda x: x["start_no"])
+                sorted_data = []
+                for block_text in run_order:
+                    target_cat, _ = self._parse_block_info(block_text)
+                    block_teams = sorted([d for d in tab_data_pool if d["category"] == target_cat], key=lambda x: x["start_no"])
+                    for team in block_teams:
+                        if team not in sorted_data: sorted_data.append(team)
 
+            # --- TABLE UI ---
             table = QTableWidget()
-            table.setObjectName("dataTable") 
+            table.setObjectName("dataTable")
+            max_attempts = max([len(d["attempts"]) for d in self.current_results_data], default=1)
             
-            # --- Build Dynamic Headers ---
-            base_headers = [
-                tr.t("lb_col_rank"),
-                tr.t("lb_col_start_no"),
-                tr.t("lb_col_team"),
-                tr.t("common_col_status"),
-                tr.t("lb_col_top_result")
-            ]
-            attempt_headers = []
+            headers = [tr.t("lb_col_rank"), tr.t("lb_col_start_no"), tr.t("lb_col_team"), tr.t("common_col_status"), tr.t("lb_col_top_result")]
             for i in range(1, max_attempts + 1):
-                attempt_headers.extend([f"L{i}", f"P{i}", f"{tr.t('lb_col_time')} {i}"])
-
-            headers = base_headers + attempt_headers
+                headers.extend([f"L{i}", f"P{i}", f"{tr.t('lb_col_time')} {i}"])
+            
             table.setColumnCount(len(headers))
             table.setHorizontalHeaderLabels(headers)
-            
-            # Stretch the "Team" column
             table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
             table.setEditTriggers(QTableWidget.NoEditTriggers)
-            table.setSelectionBehavior(QTableWidget.SelectRows)
-
             table.setRowCount(len(sorted_data))
-            
-            # --- Populate Rows ---
+
+            active_highlighted = False
             for row_idx, data in enumerate(sorted_data):
                 rank_text = str(row_idx + 1) if sort_by_placement and data["best_time_val"] is not None else "-"
-                
-                # Overall Status Colors
-                bg_color = QColor("#1e1e2e") 
-                text_color = QColor("#cdd6f4")
+                bg_color, text_color = QColor("#1e1e2e"), QColor("#cdd6f4")
+                status_str = data["status"]
+
+                if not sort_by_placement and not active_highlighted and data["status"] in ["PREPARING", "READY"]:
+                    bg_color, text_color = QColor("#89b4fa"), QColor("#11111b")
+                    status_str = "🚀 " + tr.t("state_running")
+                    active_highlighted = True
                 
                 if data["status"] == "DONE":
                     status_str = "✅ " + tr.t("state_done")
-                    bg_color, text_color = QColor("#a6e3a1"), QColor("#11111b") 
+                    if not active_highlighted: bg_color, text_color = QColor("#a6e3a1"), QColor("#11111b")
                 elif data["status"] == "NP":
                     status_str = "❌ " + tr.t("state_np")
-                    bg_color, text_color = QColor("#f38ba8"), QColor("#11111b") 
-                elif data["status"] == "PREPARING":
-                    status_str = "⏳ " + tr.t("state_preparing")
-                    bg_color, text_color = QColor("#f9e2af"), QColor("#11111b") 
-                else:
-                    status_str = "⏳ " + tr.t("lb_status_waiting")
+                    bg_color, text_color = QColor("#f38ba8"), QColor("#11111b")
 
-                # Top Result Styling
-                top_res_str = data["best_time_str"]
-                if top_res_str not in ["NP", "--.---", ""]: 
-                    top_res_str = f"{float(top_res_str):.3f}"
+                top_res = data["best_time_str"]
+                if top_res not in ["NP", "--.---", ""]: 
+                    try: top_res = f"{float(top_res):.3f}"
+                    except: pass
 
-                # Create Base Cells
-                cells = [
-                    QTableWidgetItem(rank_text),
-                    QTableWidgetItem(str(data["start_no"])),
-                    QTableWidgetItem(data["team"]),
-                    QTableWidgetItem(status_str),
-                    QTableWidgetItem(top_res_str)
-                ]
+                cells = [QTableWidgetItem(rank_text), QTableWidgetItem(str(data["start_no"])), QTableWidgetItem(data["team"]), QTableWidgetItem(status_str), QTableWidgetItem(top_res)]
 
-                # Create Attempt Cells dynamically
                 for i in range(max_attempts):
                     if i < len(data["attempts"]):
-                        attempt = data["attempts"][i]
-                        l_time = str(attempt.get("time_left", "--"))
-                        r_time = str(attempt.get("time_right", "--"))
-                        res_time = str(attempt.get("result_time", "--"))
-                    else:
-                        l_time = r_time = res_time = "--"
-                    
-                    cells.extend([
-                        QTableWidgetItem(l_time),
-                        QTableWidgetItem(r_time),
-                        QTableWidgetItem(res_time)
-                    ])
+                        att = data["attempts"][i]
+                        cells.extend([QTableWidgetItem(str(att.get("time_left", "--"))), QTableWidgetItem(str(att.get("time_right", "--"))), QTableWidgetItem(str(att.get("final_time", "--") if att.get("final_time") != 999999 else "NP"))])
+                    else: cells.extend([QTableWidgetItem("--"), QTableWidgetItem("--"), QTableWidgetItem("--")])
 
-                # Apply formatting
-                bold_font = QFont()
-                bold_font.setBold(True)
-
+                bold_font = QFont(); bold_font.setBold(True)
                 for col, item in enumerate(cells):
-                    # Default row colors
-                    item.setBackground(bg_color)
-                    item.setForeground(text_color)
-                    item.setTextAlignment(Qt.AlignCenter)
-                    
-                    # Special highlighting for the "TOP RESULT" column (index 4)
+                    item.setBackground(bg_color); item.setForeground(text_color); item.setTextAlignment(Qt.AlignCenter)
                     if col == 4:
                         item.setFont(bold_font)
-                        if bg_color.name() == "#1e1e2e": # If standard row, make text Yellow
-                            item.setForeground(QColor("#f9e2af"))
-                    
-                    # Medal position styling (only if sorting by placement and rank is 1-3)
+                        if not sort_by_placement and bg_color.name() == "#1e1e2e": item.setForeground(QColor("#f9e2af"))
                     if sort_by_placement and rank_text.isdigit():
-                        rank_num = int(rank_text)
-                        if rank_num == 1:
-                            item.setBackground(QColor("#FFD700"))
-                            item.setForeground(QColor("#11111b"))
-                            item.setFont(bold_font)
-                        elif rank_num == 2:
-                            item.setBackground(QColor("#C0C0C0"))
-                            item.setForeground(QColor("#11111b"))
-                            item.setFont(bold_font)
-                        elif rank_num == 3:
-                            item.setBackground(QColor("#CD7F32"))
-                            item.setForeground(QColor("#ffffff"))
-                            item.setFont(bold_font)
-                            
+                        r_num = int(rank_text)
+                        if r_num == 1: item.setBackground(QColor("#f9e2af")); item.setForeground(QColor("#11111b")) # GOLD
+                        elif r_num == 2: item.setBackground(QColor("#C0C0C0")); item.setForeground(QColor("#11111b")) # SILVER
+                        elif r_num == 3: item.setBackground(QColor("#CD7F32")); item.setForeground(QColor("#ffffff")) # BRONZE
                     table.setItem(row_idx, col, item)
 
             self.tabs.addTab(table, tab_title)
 
+        # RESTORE TAB INDEX
+        if current_tab_idx >= 0 and current_tab_idx < self.tabs.count():
+            self.tabs.setCurrentIndex(current_tab_idx)
+
+    def _parse_block_info(self, block_text):
+        if " - " not in block_text: return None, 0
+        parts = block_text.split(" - ")
+        category = parts[0]
+        numbers = re.findall(r'\d+', parts[1])
+        attempt_num = int(numbers[0]) if numbers else 1
+        return category, attempt_num - 1
+
     def refresh_dropdowns(self):
-        """Clears and reloads the leagues and races from Firebase."""
-        self.combo_league.blockSignals(True)
-        self.combo_race.blockSignals(True)
-        
-        self.combo_league.clear()
-        self.combo_race.clear()
-        
+        self.combo_league.blockSignals(True); self.combo_race.blockSignals(True)
+        self.combo_league.clear(); self.combo_race.clear()
         for league in self.db.get_all_leagues():
             self.combo_league.addItem(league["name"], league["id"])
-            
-        self.combo_league.blockSignals(False)
-        self.combo_race.blockSignals(False)
+        self.combo_league.blockSignals(False); self.combo_race.blockSignals(False)
         self.load_races()

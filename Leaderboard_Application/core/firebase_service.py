@@ -1,8 +1,9 @@
 import os
 import requests
 import json
-import urllib.parse # Make sure this is imported at the top of your file
-#from config_manager import ConfigManager
+import urllib.parse
+
+from core.config_manager import ConfigManager
 
 class FirebaseService:
     def __init__(self, language="en"):

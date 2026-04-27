@@ -48,17 +48,28 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "✅ Build successful!"
     echo ""
-    echo "Your app is ready at: ./dist/Leaderboard.app"
+    echo "📦 Copying config files into the app bundle..."
+    
+    # Create necessary directories inside the .app
+    mkdir -p "./dist/StopwatchControl.app/lang"
+    mkdir -p "./dist/StopwatchControl.app/themes"
+    
+    # Copy files to the root of the .app (next to Contents folder)
+    cp -r ./lang/* "./dist/StopwatchControl.app/lang/" 2>/dev/null || true
+    cp -r ./themes/* "./dist/StopwatchControl.app/themes/" 2>/dev/null || true
+    cp firebase-config.json "./dist/StopwatchControl.app/" 2>/dev/null || true
+    cp settings.json "./dist/StopwatchControl.app/" 2>/dev/null || true
+    cp sport_presets.json "./dist/StopwatchControl.app/" 2>/dev/null || true
+    cp categories.json "./dist/StopwatchControl.app/" 2>/dev/null || true
+    
+    echo "✅ Files copied!"
     echo ""
-    echo "📦 IMPORTANT: Place these files next to the Leaderboard.app folder:"
-    echo "   - settings.json"
-    echo "   - sport_presets.json"
-    echo "   - categories.json"
-    echo "   - firebase-config.json"
-    echo "   - lang/ (folder with language files)"
+    echo "Your app is ready at: ./dist/StopwatchControl.app"
+    echo ""
+    echo "The app is completely self-contained with all config files inside!"
     echo ""
     echo "To run the app:"
-    echo "   open ./dist/Leaderboard.app"
+    echo "   open ./dist/StopwatchControl.app"
     echo ""
 else
     echo "❌ Build failed!"

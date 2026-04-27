@@ -181,7 +181,7 @@ If you add new JSON files that need to be outside the .app:
 
 ```python
 # In your code:
-from config_manager import ConfigManager
+from core.config_manager import ConfigManager
 
 data = ConfigManager.load_json("my_config.json", default={})
 ConfigManager.save_json("my_config.json", data)
