@@ -4,6 +4,9 @@ import os
 from PySide6.QtWidgets import QComboBox
 from PySide6.QtCore import Qt
 
+# 1. IMPORT YOUR CONFIG MANAGER
+from config_manager import ConfigManager
+
 class Translator:
     def __init__(self, lang_code="cs"):
         self.translations = {}
@@ -11,23 +14,26 @@ class Translator:
         self.load_language(lang_code)
 
     def load_language(self, lang_code):
-        # Get the directory of the current script (core/)
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        # Go up one level to the root, then into lang/
-        path = os.path.join(base_path, "..", "lang", f"{lang_code}.json")
+        # 2. USE CONFIG MANAGER FOR THE PATH
+        # This guarantees it looks in your 'dist' folder instead of the hidden _MEI folder
+        path = ConfigManager.get_resource_path(f"lang/{lang_code}.json")
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 self.translations = json.load(f)
                 self.current_lang = lang_code
         except FileNotFoundError:
-            print(f"[Warning] Language file {path} not found.")
+            # 3. SILENCE THE PRINT STATEMENT
+            # print(f"[Warning] Language file {path} not found.")
             self.translations = {}
 
     def get_available_languages(self):
         """Returns a list of available language codes from the lang/ folder."""
-        lang_dir = "lang"
-        if not os.path.exists(lang_dir): return []
+        # 4. USE CONFIG MANAGER HERE TOO
+        lang_dir = ConfigManager.get_resource_path("lang")
+        
+        if not os.path.exists(lang_dir): 
+            return []
         return sorted([f.replace(".json", "") for f in os.listdir(lang_dir) if f.endswith(".json")])
 
     def t(self, key, **kwargs):

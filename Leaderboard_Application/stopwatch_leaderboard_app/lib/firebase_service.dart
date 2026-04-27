@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart'; // REQUIRED to check if running on Web/PWA
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'team_model.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'team_model.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -17,14 +18,7 @@ class FirebaseService {
     _navigatorKey = key;
   }
 
-  bool isMasterNotificationEnabled = false;
-  List<String> _subscribedRaces = [];
-
-  Future<bool> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _subscribedRaces = prefs.getStringList('subscribed_races') ?? [];
-    return true;
-  }
+  // --- DATA STREAMS ---
 
   // 1. Get Leagues Stream
   Stream<List<String>> getLeaguesStream() {
@@ -46,7 +40,6 @@ class FirebaseService {
       if (!snapshot.exists || snapshot.data() == null) return RaceSettings.defaultSettings();
 
       final data = snapshot.data()!;
-      // Extract the 'settings' map from the document
       final settingsData = data['settings'] as Map<String, dynamic>?;
       return RaceSettings.fromMap(settingsData);
     });
@@ -63,13 +56,9 @@ class FirebaseService {
         .map((snapshot) {
       if (!snapshot.exists || snapshot.data() == null) return <Team>[];
 
-      // 1. Get document data as a Map
       final data = snapshot.data() as Map<String, dynamic>;
-
-      // 2. Get the raw start_list
       final rawStartList = data['start_list'];
 
-      // 3. Safe parsing: convert List to Map if necessary
       Map<String, dynamic> startListMap = {};
 
       if (rawStartList is List) {
@@ -82,7 +71,6 @@ class FirebaseService {
         startListMap = Map<String, dynamic>.from(rawStartList);
       }
 
-      // 4. Create the list of teams
       List<Team> teams = [];
 
       startListMap.forEach((key, value) {
@@ -102,10 +90,11 @@ class FirebaseService {
     });
   }
 
-  // --- NOTIFICATIONS LOGIC ---
+  // --- NOTIFICATIONS LOGIC (HYBRID: TOPICS + TOKENS) ---
+
   static const String _prefKey = "subscribed_topics";
   List<String> _subscribedIds = [];
-  bool isMasterOn = false; // "Global" switch
+  bool isMasterOn = false;
 
   Future<void> initNotifications() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -114,40 +103,93 @@ class FirebaseService {
   }
 
   bool isRaceNotificationEnabled(String raceId) {
-    if (isMasterOn) return true; // Global overrides local
+    if (isMasterOn) return true;
     return _subscribedIds.contains(raceId);
   }
+
+  // Helper method to get the current language from SharedPreferences
+  Future<String> _getCurrentLanguage() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('selected_language') ?? 'cs'; // Default to 'cs' if not found
+  }
+
+// --- UPDATED: TOKEN-ONLY NOTIFICATIONS ---
 
   Future<void> toggleMasterNotification(String leagueId, bool enable) async {
     isMasterOn = enable;
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool("master_notif", enable);
 
-    if (enable) {
-      await FirebaseMessaging.instance.subscribeToTopic("league_$leagueId");
-    } else {
-      await FirebaseMessaging.instance.unsubscribeFromTopic("league_$leagueId");
-    }
+    String lang = await _getCurrentLanguage();
+
+    // REMOVED kIsWeb check and Topics.
+    // Now EVERY platform saves its token to Firestore.
+    await _updateFirestoreToken(leagueId: leagueId, subscribe: enable, lang: lang);
   }
 
   Future<void> setRaceNotification(String leagueId, String raceId, bool enable) async {
-    String topic = "race_${leagueId}_$raceId";
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    String lang = await _getCurrentLanguage();
 
     if (enable) {
-      _subscribedIds.add(raceId);
-      await FirebaseMessaging.instance.subscribeToTopic(topic);
+      if (!_subscribedIds.contains(raceId)) _subscribedIds.add(raceId);
     } else {
       _subscribedIds.remove(raceId);
-      await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
     }
-
     await prefs.setStringList(_prefKey, _subscribedIds);
+
+    // REMOVED kIsWeb check and Topics.
+    // Now EVERY platform saves its token to Firestore.
+    await _updateFirestoreToken(raceId: raceId, subscribe: enable, lang: lang);
+  }
+  
+  // Private helper to handle Firestore token writing for Web/iOS-PWA
+  Future<void> _updateFirestoreToken({String? raceId, String? leagueId, required bool subscribe, required String lang}) async {
+    try {
+      // NOTE: For Web, you MUST provide your VAPID key from Firebase Project Settings -> Cloud Messaging
+      String? token = await FirebaseMessaging.instance.getToken(
+          vapidKey: "BIpgBBBkba1SAXvyuYC5ROVs6P2akxwHzcicNuq0SgKeIv2x5RqoBQKw7OCcocNOjSzMbePIuvzIeGmWDLRqGus" // <--- REPLACE THIS WITH YOUR WEB VAPID KEY
+      );
+
+      if (token == null) return;
+
+      final docRef = _db.collection('UserTokens').doc(token);
+
+      if (subscribe) {
+        Map<String, dynamic> updateData = {
+          'token': token,
+          'language': lang,
+          'last_updated': FieldValue.serverTimestamp(),
+        };
+
+        if (raceId != null) {
+          updateData['subscribed_races'] = FieldValue.arrayUnion([raceId]);
+        }
+        if (leagueId != null) {
+          updateData['subscribed_leagues'] = FieldValue.arrayUnion([leagueId]);
+        }
+
+        await docRef.set(updateData, SetOptions(merge: true));
+      } else {
+        Map<String, dynamic> removeData = {};
+        if (raceId != null) {
+          removeData['subscribed_races'] = FieldValue.arrayRemove([raceId]);
+        }
+        if (leagueId != null) {
+          removeData['subscribed_leagues'] = FieldValue.arrayRemove([leagueId]);
+        }
+
+        if (removeData.isNotEmpty) {
+          await docRef.update(removeData);
+        }
+      }
+    } catch (e) {
+      print("Error updating Firestore token: $e");
+    }
   }
 
   // --- OVER THE AIR (OTA) TRANSLATIONS LOGIC ---
 
-  // Fetches the 'metadata' document to see which languages exist and their versions
   Future<Map<String, dynamic>> getTranslationVersions() async {
     try {
       final doc = await _db.collection('Translations').doc('metadata').get();
@@ -158,7 +200,6 @@ class FirebaseService {
     }
   }
 
-  // Downloads the actual dictionary for a specific language (e.g., 'en' or 'de')
   Future<Map<String, dynamic>> downloadLanguageData(String langCode) async {
     try {
       final doc = await _db.collection('Translations').doc(langCode).get();

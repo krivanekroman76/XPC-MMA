@@ -4,6 +4,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 import serial.tools.list_ports
 from PySide6.QtCore import Qt
 from core.translate import tr
+import requests
+import threading
 
 class AttemptConfirmDialog(QDialog):
     """
@@ -194,12 +196,11 @@ class AttemptConfirmDialog(QDialog):
         self.lbl_np_reason.setText(tr.t("confirm_np_reason_lbl"))
         self.input_custom_reason.setPlaceholderText(tr.t("ph_custom_reason"))
         self.combo_np_reason.clear()
-        self.combo_np_reason.addItems([
-            tr.t("reason_np_early_start"),
-            tr.t("reason_np_hose"),
-            tr.t("reason_np_line"),
-            tr.t("reason_other")
-        ])
+        
+        self.combo_np_reason.addItem(tr.t("reason_np_early_start"), "reason_np_early_start")
+        self.combo_np_reason.addItem(tr.t("reason_np_hose"), "reason_np_hose")
+        self.combo_np_reason.addItem(tr.t("reason_np_line"), "reason_np_line")
+        self.combo_np_reason.addItem(tr.t("reason_other"), "reason_other")
         
         # Valid Translations
         self.lbl_base_time.setText(tr.t("confirm_base_time_lbl"))
@@ -231,19 +232,27 @@ class AttemptConfirmDialog(QDialog):
         }
 
         if final_selected_state == "NP":
-            reason = self.combo_np_reason.currentText()
-            if reason == tr.t("reason_other"):
-                reason = self.input_custom_reason.text()
-            data["reason"] = reason
+            # Extract the hidden KEY (e.g., "reason_np_early_start")
+            reason_key = self.combo_np_reason.currentData()
+            
+            if reason_key == "reason_other":
+                # If it's custom, we have to send the raw typed text
+                data["reason"] = self.input_custom_reason.text()
+            else:
+                # Otherwise, save the KEY to Firestore
+                data["reason"] = reason_key
+                
             data["final_time"] = None
+            
         else:
             if self.race_config.get("penalties_enabled", False):
                 penalties = [sb.value() for sb in self.penalty_spinboxes]
                 data["penalties_per_track"] = penalties
                 data["total_penalties"] = sum(penalties)
                 
-                reason = self.combo_penalty_reason.currentText()
-                data["reason"] = reason if data["total_penalties"] > 0 else ""
+                # Do the same for penalties!
+                penalty_key = self.combo_penalty_reason.currentData()
+                data["reason"] = penalty_key if data["total_penalties"] > 0 else ""
 
                 if self.race_config.get("penalty_type", "seconds") == "seconds":
                     data["final_time"] = self.base_time + data["total_penalties"]

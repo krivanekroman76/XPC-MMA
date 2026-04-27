@@ -35,19 +35,17 @@ class LoginWindow(QWidget):
 
     def load_local_settings(self):
         """Loads settings.json. If it doesn't exist, returns default values."""
-        if os.path.exists("settings.json"):
-            try:
-                with open("settings.json", "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except json.JSONDecodeError:
-                pass
+        from config_manager import ConfigManager
+        settings = ConfigManager.load_json("settings.json")
+        if settings:
+            return settings
         # Default values
         return {"remember_email": False, "saved_email": "", "lang": "cs"}
 
     def save_local_settings(self):
         """Saves the current settings to a file."""
-        with open("settings.json", "w", encoding="utf-8") as f:
-            json.dump(self.local_settings, f, indent=4)
+        from config_manager import ConfigManager
+        ConfigManager.save_json("settings.json", self.local_settings)
 
     def setup_ui(self):
         # Main vertical layout

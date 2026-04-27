@@ -50,8 +50,6 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
   @override
   Widget build(BuildContext context) {
     String uniqueRaceId = "${selectedLeague}_$selectedRace";
-    bool isSubscribed = FirebaseService().isRaceNotificationEnabled(uniqueRaceId);
-    bool isMasterOn = FirebaseService().isMasterNotificationEnabled;
 
     final themeProvider = Provider.of<ThemeProvider>(context);
     final colorScheme = Theme.of(context).colorScheme;
@@ -112,7 +110,7 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
 
                         _showToast(
                             context,
-                            !isSubscribed ? "Notifications On" : "Notifications Off",
+                            !isSubscribed ? themeProvider.translateKey('notif_on') : themeProvider.translateKey('notif_off'),
                             !isSubscribed ? Colors.green : Colors.grey,
                             !isSubscribed ? Icons.notifications_active : Icons.notifications_off
                         );
@@ -326,7 +324,13 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
         }
 
         if (currentSort == SortType.startNo) {
-          teams.sort((a, b) => a.startNo.compareTo(b.startNo));
+          teams.sort((a, b) {
+            // Parse the team 'id' (which holds the Firestore array index) to an integer
+            int indexA = int.tryParse(a.id) ?? a.startNo;
+            int indexB = int.tryParse(b.id) ?? b.startNo;
+
+            return indexA.compareTo(indexB);
+          });
         } else {
           teams = fullSortedList;
         }

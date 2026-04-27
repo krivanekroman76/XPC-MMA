@@ -5,11 +5,11 @@ from PySide6.QtCore import Qt
 from core.translate import tr, LanguageSelector
 
 # Here you will gradually uncomment other pages as you create them
-from GUI_windows.pages.admin_tools import AdminToolsPage
-from GUI_windows.pages.league_page import LeaguePage
-from GUI_windows.pages.race_page import RacePage
-from GUI_windows.pages.timing_page import TimingPage
-from GUI_windows.pages.leaderboard_page import LeaderboardPage
+from GUI_windows.admin_tools import AdminToolsPage
+from GUI_windows.league_page import LeaguePage
+from GUI_windows.race_page import RacePage
+from GUI_windows.timing_page import TimingPage
+from GUI_windows.leaderboard_page import LeaderboardPage
 
 class DashboardWindow(QWidget):
     def __init__(self, db_service):

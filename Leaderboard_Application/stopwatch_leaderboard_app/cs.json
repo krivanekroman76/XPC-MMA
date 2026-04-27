@@ -30,5 +30,14 @@
   "main_menu": "Hlavní menu",
   "st": "ST",
   "team": "TÝM",
-  "result": "VÝSLEDEK"
+  "result": "VÝSLEDEK",
+  "notif_on":  "Notifickace Zaptnuty",
+  "notif_off": "Notifikace Vypnuty",
+  "reason_np_early_start": "Předčasný start",
+  "reason_np_hose": "Nezapojená proudnice",
+  "reason_np_line": "Přešlap na čáře",
+  "reason_pen_none": "Bez penalizace",
+  "reason_pen_base": "Chyba na základně",
+  "reason_pen_suction": "Špatné sání",
+  "reason_other": "Jiné..."
 }

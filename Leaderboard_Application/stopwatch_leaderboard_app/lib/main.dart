@@ -16,15 +16,16 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseService().setNavigatorKey(navigatorKey);
+  // Initialize your service and load saved subscription states
+  final firebaseService = FirebaseService();
+  firebaseService.setNavigatorKey(navigatorKey);
+  await firebaseService.initNotifications(); // <--- ADD THIS LINE
 
-  // NEW: Initialize SharedPreferences before running the app
   final prefs = await SharedPreferences.getInstance();
 
   runApp(
     MultiProvider(
       providers: [
-        // NEW: Pass the prefs into your ThemeProvider
         ChangeNotifierProvider(create: (_) => ThemeProvider(prefs)),
       ],
       child: const MyApp(),

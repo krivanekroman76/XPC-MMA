@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import urllib.parse # Make sure this is imported at the top of your file
+from config_manager import ConfigManager
 
 class FirebaseService:
     def __init__(self, language="en"):
@@ -16,8 +17,10 @@ class FirebaseService:
         self.i18n = self._load_translations()
         
         try:
-            with open('firebase-config.json') as f:
-                config = json.load(f)
+            config = ConfigManager.load_json('firebase-config.json')
+            if not config:
+                print(self._t("err_config_missing"))
+                return
                 
             self.api_key = config["apiKey"]
             self.project_id = config["projectId"]
@@ -34,12 +37,7 @@ class FirebaseService:
     
     def _load_translations(self):
         """Loads strings from the respective language JSON file."""
-        try:
-            with open(f'{self.language}.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"[Warning] Translation file {self.language}.json not found. Falling back to keys.")
-            return {}
+        return ConfigManager.load_json(f'lang/{self.language}.json', {})
 
     def _t(self, key, **kwargs):
         """Fetches the translation and formats it with provided kwargs."""
@@ -375,6 +373,39 @@ class FirebaseService:
             self.log(f"[CRITICAL] Failed to create race. Status: {response.status_code}")
             self.log(f"[CRITICAL] Firebase Response: {response.text}")
             return False
+        
+    def update_race(self, league_id, race_id, name, date_time, writer_uid):
+        """Updates the basic metadata (name, date, writer) of an existing race."""
+        if not league_id or not race_id:
+            return False, "Missing league or race ID"
+
+        try:
+            # Use updateMask to ensure we ONLY overwrite these three fields
+            # and don't accidentally erase start_list, status, or settings
+            url = f"{self.db_url}/Leagues/{league_id}/Races/{race_id}?updateMask.fieldPaths=name&updateMask.fieldPaths=date_time&updateMask.fieldPaths=writer_uid"
+            
+            firestore_payload = {
+                "fields": {
+                    "name": {"stringValue": name},
+                    "date_time": {"stringValue": date_time},
+                    "writer_uid": {"stringValue": writer_uid}
+                }
+            }
+            
+            response = self._make_request("PATCH", url, json=firestore_payload)
+            response.raise_for_status()
+            
+            self.log(f"Race '{name}' (ID: {race_id}) updated successfully.")
+            return True, "Race updated successfully"
+            
+        except requests.exceptions.HTTPError as e:
+            msg = f"HTTP Error updating race: {e.response.text}"
+            self.log(msg)
+            return False, msg
+        except Exception as e:
+            msg = f"Failed to update race: {str(e)}"
+            self.log(msg)
+            return False, msg
         
     def get_race(self, league_id, race_id):
         """Fetches the entire race document (settings, status, start_list)"""

@@ -30,5 +30,14 @@
   "main_menu": "Main Menu",
   "st": "ST",
   "team": "TEAM",
-  "result": "RESULT"
+  "result": "RESULT",
+  "notif_on":  "Notifications ON",
+  "notif_off": "Notifications OFF",
+  "reason_np_early_start": "Early start",
+  "reason_np_hose": "Disconnected hose",
+  "reason_np_line": "Line fault",
+  "reason_pen_none": "No penalty",
+  "reason_pen_base": "Base error",
+  "reason_pen_suction": "Bad suction",
+  "reason_other": "Other..."
 }

@@ -15,13 +15,17 @@ class BaseSport:
         if max_time >= 999999:
             return 999999
             
-        # Add penalty time (converted from seconds to milliseconds)
-        final_time = max_time + (penalty_seconds * 1000)
+        # FIXED: Removed the * 1000 since max_time is already in seconds
+        final_time = max_time + penalty_seconds
         return final_time
 
     def get_best_time(self, attempts_data):
-        # Filter out 0 (not run yet) and 999999 (Invalid/NP)
-        valid_times = [a.get("final_time", 0) for a in attempts_data if 0 < a.get("final_time", 0) < 999999]
+        # Filter out 0 (not run yet), 999999 (Invalid/NP), and None values
+        valid_times = [
+            a.get("final_time") 
+            for a in attempts_data 
+            if a.get("final_time") is not None and 0 < a.get("final_time") < 999999
+        ]
         
         if not valid_times:
             return 999999 # NP or no valid times yet
@@ -37,7 +41,8 @@ class FireAttackLogic(BaseSport):
     pass
 
 class RelayLogic(BaseSport):
-    def calculate_attempt_time(self, sections_data):
+    # FIXED: Signature updated to match BaseSport and what the GUI sends
+    def calculate_attempt_time(self, sections_data, penalty_seconds=0):
         """
         Očekává data z GUI ve formátu např:
         sections_data = [
@@ -48,16 +53,23 @@ class RelayLogic(BaseSport):
         """
         total_time = 0
         
+        # Note: If the GUI passes a dictionary like {"L1": 16.5} instead of 
+        # a list of sections, you will need to adapt this logic to handle dictionaries!
+        
+        # Check if sections_data is a list (Relay format) or dict (Standard format)
+        if isinstance(sections_data, dict):
+            # Fallback if standard GUI calls RelayLogic with standard lanes_dict
+            return super().calculate_attempt_time(sections_data, penalty_seconds)
+
         for section in sections_data:
             # Pokud má jakýkoliv úsek NP, celý pokus je obvykle NP
             if section.get("np_reason"):
-                # Můžeme zde rovnou vrátit 999999 nebo odeslat zprávu
                 print(f"Pokus neplatný! Důvod: {section['np_reason']}")
                 return 999999
                 
             total_time += section.get("time", 0) + section.get("penalty_seconds", 0)
             
-        return total_time
+        return total_time + penalty_seconds
 
 class TfaLogic(BaseSport):
     """

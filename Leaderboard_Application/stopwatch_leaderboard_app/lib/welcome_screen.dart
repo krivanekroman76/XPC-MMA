@@ -6,6 +6,7 @@ import 'theme_provider.dart';
 import 'firebase_service.dart';
 import 'home_screen.dart'; // Ensure this contains your RaceLeaderboard class
 import 'settings_screen.dart';
+import 'package:flutter/foundation.dart'; // REQUIRED for kIsWeb
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -65,43 +66,45 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _toggleGlobalNotification() async {
     if (_savedLeague == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    // Clean topic name (FCM doesn't like spaces)
-    String topic = "league_${_savedLeague!.replaceAll(' ', '_')}";
-
     // Ask for permission (Required for Web/iOS)
     NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      setState(() => _isGlobalSubscribed = !_isGlobalSubscribed);
+      bool newValue = !_isGlobalSubscribed;
 
-      if (_isGlobalSubscribed) {
-        await FirebaseMessaging.instance.subscribeToTopic(topic);
-      } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
-      }
+      setState(() => _isGlobalSubscribed = newValue);
 
-      await prefs.setBool('global_$_savedLeague', _isGlobalSubscribed);
+      // Let FirebaseService handle the platform differences (Topics vs Firestore Tokens)
+      await FirebaseService().toggleMasterNotification(_savedLeague!, newValue);
+
+      // Keep local UI state in sync
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('global_$_savedLeague', newValue);
     }
   }
 
   // Handle Individual Race Bell Toggle
   Future<void> _toggleRaceNotification(String race) async {
-    final prefs = await SharedPreferences.getInstance();
-    String topic = "race_${_savedLeague}_$race".replaceAll(' ', '_');
+    if (_savedLeague == null) return;
 
     NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      bool isSubscribing = !_subscribedRaces.contains(race);
+
       setState(() {
-        if (_subscribedRaces.contains(race)) {
-          _subscribedRaces.remove(race);
-          FirebaseMessaging.instance.unsubscribeFromTopic(topic);
-        } else {
+        if (isSubscribing) {
           _subscribedRaces.add(race);
-          FirebaseMessaging.instance.subscribeToTopic(topic);
+        } else {
+          _subscribedRaces.remove(race);
         }
       });
+
+      // Let FirebaseService handle the platform differences (Topics vs Firestore Tokens)
+      await FirebaseService().setRaceNotification(_savedLeague!, race, isSubscribing);
+
+      // Keep local UI state in sync
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('subscribed_races', _subscribedRaces.toList());
     }
   }

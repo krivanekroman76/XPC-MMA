@@ -1,28 +1,28 @@
 import sys
-import json
 import os
 from PySide6.QtWidgets import QApplication
 
+from config_manager import ConfigManager
 from GUI_windows.login import LoginWindow
 from GUI_windows.confirm import AttemptConfirmDialog
 
+# Add this: Force the app to use its own location as the starting point
+if getattr(sys, 'frozen', False):
+    os.chdir(os.path.dirname(sys.executable))
+    
 def load_theme(app):
     """
     Loads the theme name from settings.json and applies the corresponding .qss file.
     """
     theme_name = "dark-blue" # Default theme if the file or key doesn't exist
     
-    # Attempt to load from settings.json
-    try:
-        if os.path.exists("settings.json"):
-            with open("settings.json", "r", encoding="utf-8") as f:
-                settings = json.load(f)
-                theme_name = settings.get("theme", "dark-blue")
-    except Exception as e:
-        print(f"Error loading settings.json: {e}")
+    # Load settings from ConfigManager
+    settings = ConfigManager.load_json("settings.json")
+    if settings:
+        theme_name = settings.get("theme", "dark-blue")
 
     # Path to the stylesheet file
-    theme_path = os.path.join("themes", f"{theme_name}.qss")
+    theme_path = ConfigManager.get_resource_path(f"themes/{theme_name}.qss")
     
     # Apply the stylesheet
     if os.path.exists(theme_path):
