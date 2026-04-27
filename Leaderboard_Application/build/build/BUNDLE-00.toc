@@ -1,4 +1,0 @@
-([('Stopwatch Control',
-   '/Users/romankrivanek/AndroidStudioProjects/Leaderboard_Application/dist/Stopwatch '
-   'Control',
-   'EXECUTABLE')],)
