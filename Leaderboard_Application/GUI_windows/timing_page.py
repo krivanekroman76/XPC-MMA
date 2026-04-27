@@ -427,14 +427,20 @@ class TimingPage(QWidget):
         if dialog.exec(): 
             results = dialog.get_result_data()
             
+            # --- GET PREVIOUS BEST TIME ---
+            previous_best = self.sport_logic.get_best_time(run_obj.get("attempts", []))
+            title_key = "valid_attempt"
+            is_np_flag = False
+            
             # --- 1. UPDATE LOCAL DATA ---
             if results["status"] == "NP":
                 current_attempt["state"] = "NP"
                 current_attempt["final_time"] = 999999
                 current_attempt["reason"] = results.get("reason", "")
                 
-                # The key to send to Firebase
                 push_reason_key = results.get("reason", "") 
+                is_np_flag = True
+                title_key = "invalid_attempt"
             else:
                 current_attempt["state"] = "DONE"
                 
@@ -451,9 +457,16 @@ class TimingPage(QWidget):
                 current_attempt["reason"] = results.get("reason", "")
                 current_attempt["track_penalties"] = results.get("penalties_per_track", [])
                 
-                # The text to send to Firebase for valid attempts
-                push_reason_key = f"Time: {final_time}s"
+                push_reason_key = f"{final_time}" # Send only the time
+                
+                # --- LOGIC FOR TIME COMPARISON ---
+                if attempt_idx > 0 and previous_best < 999999:
+                    if final_time < previous_best:
+                        title_key = "time_improved"
+                    elif final_time > previous_best:
+                        title_key = "time_worse"
 
+            # write the new best time into the run object for future comparisons
             run_obj["best_time"] = self.sport_logic.get_best_time(run_obj.get("attempts", []))
             
             total_attempts_allowed = self.race_settings.get("attempts", 1)
@@ -466,40 +479,16 @@ class TimingPage(QWidget):
             self.save_and_refresh()
 
             # --- 3. TRIGGER CLOUD FUNCTION ---
-            # Extract variables directly from the UI combo boxes
             league_id = self.league_combo.currentData() or "UNKNOWN_LEAGUE"
             race_id = self.race_combo.currentData() or "UNKNOWN_RACE"
-            
-            # We found out earlier that the key is "team"
             team_name = run_obj.get("team", "Unknown Team")
 
-            # Run the request in a background thread so the UI doesn't freeze
             threading.Thread(
                 target=self.trigger_push_notification, 
-                args=(race_id, league_id, team_name, push_reason_key),
+                args=(race_id, league_id, team_name, push_reason_key, is_np_flag, title_key),
                 daemon=True
             ).start()
-
-    # Add this helper method anywhere inside your class
-    def trigger_push_notification(self, race_id, league_id, team_name, reason_key):
-        # Replace with the actual URL Firebase gave you
-        function_url = "https://send-np-notification-hmj4n4ebuq-uc.a.run.app"
-        
-        payload = {
-            "raceId": race_id,
-            "leagueId": league_id,
-            "teamName": team_name,
-            "reasonKey": reason_key 
-        }
-        
-        try:
-            response = requests.post(function_url, json=payload)
-            if response.status_code == 200:
-                print(f"Push notification sent successfully for {team_name}!")
-            else:
-                print(f"Failed to send push: {response.text}")
-        except Exception as e:
-            print(f"Error calling Cloud Function: {e}")
+            # moved trigger_push_notification to firebase_service.py for better separation of concerns
             
     def save_and_refresh(self):
         league_id = self.league_combo.currentData()

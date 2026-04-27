@@ -1,11 +1,11 @@
 {
-    "name": "stopwatch_leaderboard_app",
-    "short_name": "stopwatch_leaderboard_app",
+    "name": "FireTimer Výsledky",
+    "short_name": "FireTimer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Aplikace pro výsledky hasičských soutěží",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

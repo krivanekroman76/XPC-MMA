@@ -1,9 +1,10 @@
 class RaceSettings {
   final int attemptsCount;
   final int lanesCount;
-  final int sectionsCount; // ADDED: To determine if we need L and R columns
-  final String logic;      // ADDED: e.g., "attack" vs "standard"
+  final int sectionsCount;
+  final String logic;
   final bool isFinished;
+  final List<String> runOrder; // ADD THIS
 
   RaceSettings({
     required this.attemptsCount,
@@ -11,16 +12,25 @@ class RaceSettings {
     required this.sectionsCount,
     required this.logic,
     required this.isFinished,
+    required this.runOrder, // ADD THIS
   });
 
   factory RaceSettings.fromMap(Map<String, dynamic>? data) {
     if (data == null) return RaceSettings.defaultSettings();
+
+    // Parse the run_order array safely
+    List<String> parsedRunOrder = [];
+    if (data['run_order'] is List) {
+      parsedRunOrder = List<String>.from(data['run_order']);
+    }
+
     return RaceSettings(
       attemptsCount: data['attempts'] ?? 2,
       lanesCount: data['lanes'] ?? 1,
-      sectionsCount: data['sections'] ?? 1, // Default to 1 if missing
+      sectionsCount: data['sections'] ?? 1,
       logic: data['logic'] ?? 'standard',
-      isFinished: false, // Update this if you have a finished flag in your DB
+      isFinished: data['isFinished'] ?? false,
+      runOrder: parsedRunOrder, // ADD THIS
     );
   }
 
@@ -30,6 +40,7 @@ class RaceSettings {
     sectionsCount: 1,
     logic: 'standard',
     isFinished: false,
+    runOrder: [], // ADD THIS
   );
 }
 
@@ -72,43 +83,53 @@ class Team {
     );
   }
 
+// 1. Update the getter for the main Result column
   String get formattedTime {
-    if (bestTime >= 999999.0) return "N/A";
+    if (bestTime >= 999999.0) {
+      // If the team has finished all runs (DONE) or is explicitly marked as NP, show NP instead of N/A
+      if (status == 'DONE' || status == 'NP') {
+        return "NP";
+      }
+      return "N/A";
+    }
     return bestTime.toStringAsFixed(3);
   }
 
-  // --- NEW: Safely extract Left Target Time ---
+// 2. Safely extract Left Target Time
   String getTimeLeft(int attemptIdx) {
     if (attemptIdx >= attempts.length) return "-";
-    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
-    if (attemptData == null) return "-";
+
+    // Use 'is Map' instead of strict casting to avoid silent null failures
+    var attemptData = attempts[attemptIdx];
+    if (attemptData is! Map) return "-";
 
     var val = attemptData['time_left'];
     if (val is num) return val.toStringAsFixed(3);
-    return val?.toString() ?? "-"; // Returns "--.---" if it's a string
+    if (val == "NP") return "NP"; // Explicitly handle the "NP" string
+    return val?.toString() ?? "-";
   }
 
-  // --- NEW: Safely extract Right Target Time ---
+// 3. Safely extract Right Target Time
   String getTimeRight(int attemptIdx) {
     if (attemptIdx >= attempts.length) return "-";
-    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
-    if (attemptData == null) return "-";
+
+    var attemptData = attempts[attemptIdx];
+    if (attemptData is! Map) return "-";
 
     var val = attemptData['time_right'];
     if (val is num) return val.toStringAsFixed(3);
-    return val?.toString() ?? "-"; // Returns "--.---" if it's a string
+    if (val == "NP") return "NP";
+    return val?.toString() ?? "-";
   }
 
-  // --- UPDATED: Safely extract Final Time (handles both string and num) ---
+// 4. Safely extract Final Time
   String getRunFinalTime(int attemptIdx) {
     if (attemptIdx >= attempts.length) return "-";
-    var attemptData = attempts[attemptIdx] as Map<String, dynamic>?;
-    if (attemptData == null) return "-";
 
-    // If NP return NP not 99999 time
-    if (attemptData['state'] == 'NP') {
-      return "NP";
-    }
+    var attemptData = attempts[attemptIdx];
+    if (attemptData is! Map) return "-";
+
+    if (attemptData['state'] == 'NP') return "NP";
 
     var val = attemptData['final_time'];
     if (val == 999999 || val == 999999.0) return "NP";

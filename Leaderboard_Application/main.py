@@ -2,9 +2,8 @@ import sys
 import os
 from PySide6.QtWidgets import QApplication
 
-from config_manager import ConfigManager
+from core.config_manager import ConfigManager
 from GUI_windows.login import LoginWindow
-from GUI_windows.confirm import AttemptConfirmDialog
 
 # Add this: Force the app to use its own location as the starting point
 if getattr(sys, 'frozen', False):

@@ -324,14 +324,42 @@ class _RaceLeaderboardState extends State<RaceLeaderboard> {
         }
 
         if (currentSort == SortType.startNo) {
-          teams.sort((a, b) {
-            // Parse the team 'id' (which holds the Firestore array index) to an integer
-            int indexA = int.tryParse(a.id) ?? a.startNo;
-            int indexB = int.tryParse(b.id) ?? b.startNo;
+          // 1. Extract the base sequence of categories from Firestore run_order
+          // E.g., translates ["Muži - 1. Pokus", "Ženy - 1. Pokus"] into ["Muži", "Ženy"]
+          List<String> baseCategorySequence = [];
+          for (String block in settings.runOrder) {
+            String cat = block.split(' - ').first.trim();
+            if (!baseCategorySequence.contains(cat)) {
+              baseCategorySequence.add(cat);
+            }
+          }
 
-            return indexA.compareTo(indexB);
+          // Fallback just in case run_order is completely empty in Firestore
+          if (baseCategorySequence.isEmpty) {
+            baseCategorySequence = ["Muži", "Ženy", "Dorost"];
+          }
+
+          // 2. Sort the teams chronologically
+          teams.sort((a, b) {
+            // First, find where each team's category sits in the overall event timeline
+            int catAIndex = baseCategorySequence.indexOf(a.category);
+            int catBIndex = baseCategorySequence.indexOf(b.category);
+
+            // Safety check: if a category isn't in the run_order, push it to the bottom
+            if (catAIndex == -1) catAIndex = 999;
+            if (catBIndex == -1) catBIndex = 999;
+
+            // If they are in different categories, sort by the run_order sequence
+            if (catAIndex != catBIndex) {
+              return catAIndex.compareTo(catBIndex);
+            }
+
+            // If they are in the SAME category, sort normally by their start number
+            return a.startNo.compareTo(b.startNo);
           });
+
         } else {
+          // Keep your existing rank sorting here
           teams = fullSortedList;
         }
 

@@ -11,6 +11,8 @@ from core.firebase_service import FirebaseService
 
 from GUI_windows.dashboard import DashboardWindow
 
+#from config_manager import ConfigManager
+        
 # ==========================================
 # IMPORT TRANSLATOR
 # ==========================================
@@ -35,7 +37,6 @@ class LoginWindow(QWidget):
 
     def load_local_settings(self):
         """Loads settings.json. If it doesn't exist, returns default values."""
-        from config_manager import ConfigManager
         settings = ConfigManager.load_json("settings.json")
         if settings:
             return settings
@@ -44,7 +45,7 @@ class LoginWindow(QWidget):
 
     def save_local_settings(self):
         """Saves the current settings to a file."""
-        from config_manager import ConfigManager
+        from core.config_manager import ConfigManager
         ConfigManager.save_json("settings.json", self.local_settings)
 
     def setup_ui(self):

@@ -2,7 +2,7 @@ import os
 import requests
 import json
 import urllib.parse # Make sure this is imported at the top of your file
-from config_manager import ConfigManager
+#from config_manager import ConfigManager
 
 class FirebaseService:
     def __init__(self, language="en"):
@@ -90,29 +90,49 @@ class FirebaseService:
         if 'integerValue' in value: return int(value['integerValue'])
         return str(value)
 
-    def _refresh_id_token(self):
-        """Automatically refreshes the Auth token when it expires."""
-        if not hasattr(self, 'refresh_token') or not self.refresh_token:
-            return False
-        url = f"https://securetoken.googleapis.com/v1/token?key={self.api_key}"
-        payload = {"grant_type": "refresh_token", "refresh_token": self.refresh_token}
-        try:
-            response = requests.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            self.id_token = data['id_token']
-            self.refresh_token = data['refresh_token']
-            return True
-        except:
-            return False
-
     def _get_headers(self):
         """Returns authorization headers for requests."""
         if not self.id_token: return {}
         return {"Authorization": f"Bearer {self.id_token}"}
 
+    def _refresh_id_token(self):
+        """
+        Automatically refreshes the Auth token when it expires (tokens expire every 1 hour).
+        Returns True if successful, False otherwise.
+        """
+        if not hasattr(self, 'refresh_token') or not self.refresh_token:
+            self.log("Refresh token missing. User must log in again.")
+            return False
+            
+        url = f"https://securetoken.googleapis.com/v1/token?key={self.api_key}"
+        
+        # NOTE: The Google token endpoint expects form-urlencoded data, NOT a JSON payload.
+        # Therefore, we must use 'data=payload' instead of 'json=payload' in the request.
+        payload = {"grant_type": "refresh_token", "refresh_token": self.refresh_token}
+        
+        try:
+            response = requests.post(url, data=payload)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Update our local tokens with the newly generated ones
+            self.id_token = data['id_token']
+            self.refresh_token = data['refresh_token']
+            
+            self.log("ID Token successfully refreshed in the background.")
+            return True
+            
+        except Exception as e:
+            self.log(f"Token refresh failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                self.log(f"Refresh error details: {e.response.text}")
+            return False
+
     def _make_request(self, method, url, **kwargs):
-        """Smart wrapper for Firestore API, handles token injection and refresh."""
+        """
+        Smart wrapper for the Firestore REST API. 
+        It automatically injects the auth token and handles silent token refreshes.
+        """
         headers = self._get_headers()
         if 'headers' in kwargs:
             headers.update(kwargs['headers'])
@@ -120,11 +140,22 @@ class FirebaseService:
 
         response = requests.request(method, url, **kwargs)
         
-        if response.status_code == 401:
-            self.log(self._t("token_expired"))
-            if self._refresh_id_token():
-                kwargs['headers'] = self._get_headers()
-                response = requests.request(method, url, **kwargs)
+        # Check if the request failed due to an expired token.
+        # Firebase sometimes returns 401 (Unauthorized), but it can also return 
+        # 403 (Permission Denied) if Firestore security rules block the expired token.
+        if response.status_code in [401, 403]:
+            
+            # Double-check that the 403 error is actually an auth issue, not a genuine rules violation
+            if response.status_code == 401 or "missing or insufficient permissions" in response.text.lower():
+                self.log(self._t("token_expired") + " Attempting auto-refresh...")
+                
+                if self._refresh_id_token():
+                    # If the token was successfully refreshed, retry the exact same request
+                    kwargs['headers'] = self._get_headers()
+                    response = requests.request(method, url, **kwargs)
+                else:
+                    self.log("Auto-refresh failed. User is completely logged out and must restart the app.")
+                    
         return response
     
     # --- AUTHENTICATION ---
@@ -608,3 +639,26 @@ class FirebaseService:
             msg = f"Failed to complete race: {str(e)}"
             self.log(msg)
             return False, msg
+
+    # This function calls the Cloud Function to send a push notification about the attempt result
+    def trigger_push_notification(self, race_id, league_id, team_name, reason_key, is_np, title_key):
+        # Replace with the actual URL Firebase gave you
+        function_url = "https://europe-west3-mma-project-91699.cloudfunctions.net/send_run_notification"
+        
+        payload = {
+            "raceId": race_id,
+            "leagueId": league_id,
+            "teamName": team_name,
+            "resultValue": reason_key,
+            "isNP": is_np,
+            "titleKey": title_key
+        }
+        
+        try:
+            response = requests.post(function_url, json=payload)
+            if response.status_code == 200:
+                print(f"Push notification sent successfully for {team_name}!")
+            else:
+                print(f"Failed to send push: {response.text}")
+        except Exception as e:
+            print(f"Error calling Cloud Function: {e}")
